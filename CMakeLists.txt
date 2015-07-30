@@ -17,7 +17,7 @@ set(ARCHS i586-vniins-linux-4.1.3
 
 set(BUILD_SYSTEM_COMMON_PATH "${PROJECT_BINARY_DIR}/.cmake")
 set(RELEASE_MAIL_TO "mail@nicetu.spb.ru")
-set(DLL, true)
+add_definitions(-DDLL)
 
 file(GLOB SOURCE_LIB src/*.c)
 file(GLOB SUB_SOURCE_LIB src/rcv/*.c)
