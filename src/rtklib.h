@@ -906,8 +906,8 @@ typedef struct {        /* RTCM control struct type */
     unsigned char lock[MAXSAT][NFREQ+NEXOBS]; /* lock time */
     unsigned char loss[MAXSAT][NFREQ+NEXOBS]; /* loss of lock count */
     gtime_t lltime[MAXSAT][NFREQ+NEXOBS]; /* last lock time */
-    int nbyte;          /* number of bytes in message buffer */ 
-    int nbit;           /* number of bits in word buffer */ 
+    int nbyte;          /* number of bytes in message buffer */
+    int nbit;           /* number of bits in word buffer */
     int len;            /* message length (bytes) */
     unsigned char buff[1200]; /* message buffer */
     unsigned int word;  /* word buffer for rtcm 2 */
@@ -1145,7 +1145,7 @@ typedef struct {        /* receiver raw data control type */
     double prCA[MAXSAT],dpCA[MAXSAT]; /* L1/CA pseudrange/doppler for javad */
     unsigned char halfc[MAXSAT][NFREQ+NEXOBS]; /* half-cycle add flag */
     char freqn[MAXOBS]; /* frequency number for javad */
-    int nbyte;          /* number of bytes in message buffer */ 
+    int nbyte;          /* number of bytes in message buffer */
     int len;            /* message length (bytes) */
     int iod;            /* issue of data */
     int tod;            /* time of day (ms) */
@@ -1490,9 +1490,9 @@ extern unsigned int getbitu(const unsigned char *buff, int pos, int len);
 extern int          getbits(const unsigned char *buff, int pos, int len);
 extern void setbitu(unsigned char *buff, int pos, int len, unsigned int data);
 extern void setbits(unsigned char *buff, int pos, int len, int data);
-extern unsigned int crc32  (const unsigned char *buff, int len);
+extern unsigned int __attribute__ ((visibility ("hidden"))) crc32  (const unsigned char *buff, int len);
 extern unsigned int crc24q (const unsigned char *buff, int len);
-extern unsigned short crc16(const unsigned char *buff, int len);
+extern unsigned short __attribute__ ((visibility ("hidden"))) crc16(const unsigned char *buff, int len);
 extern int decode_word (unsigned int word, unsigned char *data);
 extern int decode_frame(const unsigned char *buff, eph_t *eph, alm_t *alm,
                         double *ion, double *utc, int *leaps);
