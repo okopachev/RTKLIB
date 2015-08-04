@@ -18,6 +18,7 @@ set(ARCHS i586-vniins-linux-4.1.3
 set(BUILD_SYSTEM_COMMON_PATH "${PROJECT_BINARY_DIR}/.cmake")
 set(RELEASE_MAIL_TO "mail@nicetu.spb.ru")
 add_definitions(-DDLL)
+add_definitions(-DTRACE)
 
 file(GLOB SOURCE_LIB src/*.c)
 file(GLOB SUB_SOURCE_LIB src/rcv/*.c)
@@ -30,6 +31,11 @@ include_directories(src/rcv)
 
 add_library(${PROJECT_SHARED_LIBRARY} SHARED ${ALL_HEADERS} ${SUB_ALL_HEADERS} ${SOURCE_LIB} ${SUB_SOURCE_LIB})
 add_library(${PROJECT_STATIC_LIBRARY} STATIC ${ALL_HEADERS} ${SUB_ALL_HEADERS} ${SOURCE_LIB} ${SUB_SOURCE_LIB})
+
+if(WIN32)
+  add_library(${PROJECT_SHARED_LIBRARY} wsock32 ws2_32 winmm)
+  add_library(${PROJECT_STATIC_LIBRARY} wsock32 ws2_32 winmm)
+endif()
 
 install(TARGETS ${PROJECT_SHARED_LIBRARY} DESTINATION lib EXPORT ${PROJECT_NAME}_targets)
 install(TARGETS ${PROJECT_STATIC_LIBRARY} DESTINATION lib EXPORT ${PROJECT_NAME}_targets)
