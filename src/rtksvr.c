@@ -116,7 +116,7 @@ static void updatefcn(rtksvr_t *svr)
     }
 }
 /* update rtk server struct --------------------------------------------------*/
-static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, int sat,
+static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, stvec_t *stvec, int sat,
                       sbsmsg_t *sbsmsg, int index, int iobs)
 {
     eph_t *eph1,*eph2,*eph3;
@@ -185,6 +185,9 @@ static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, int sat,
             sbsupdatecorr(sbsmsg,&svr->nav);
         }
         svr->nmsg[index][3]++;
+    }
+    else if (ret==4) {
+        svr->stvec=*stvec;
     }
     else if (ret==9) { /* ion/utc parameters */
         if (svr->navsel==index||svr->navsel>=3) {
@@ -262,6 +265,7 @@ static int decoderaw(rtksvr_t *svr, int index)
 {
     obs_t *obs;
     nav_t *nav;
+    stvec_t *stvec;
     sbsmsg_t *sbsmsg=NULL;
     int i,ret,sat,fobs=0;
     
@@ -270,7 +274,7 @@ static int decoderaw(rtksvr_t *svr, int index)
     rtksvrlock(svr);
     
     for (i=0;i<svr->nb[index];i++) {
-        
+
         /* input rtcm/receiver raw data from stream */
         if (svr->format[index]==STRFMT_RTCM2) {
             ret=input_rtcm2(svr->rtcm+index,svr->buff[index][i]);
@@ -288,6 +292,7 @@ static int decoderaw(rtksvr_t *svr, int index)
             ret=input_raw(svr->raw+index,svr->format[index],svr->buff[index][i]);
             obs=&svr->raw[index].obs;
             nav=&svr->raw[index].nav;
+            stvec=&svr->raw[index].stvec;
             sat=svr->raw[index].ephsat;
             sbsmsg=&svr->raw[index].sbsmsg;
         }
@@ -298,7 +303,7 @@ static int decoderaw(rtksvr_t *svr, int index)
         }
 #endif
         /* update rtk server */
-        if (ret>0) updatesvr(svr,ret,obs,nav,sat,sbsmsg,index,fobs);
+        if (ret>0) updatesvr(svr,ret,obs,nav,stvec,sat,sbsmsg,index,fobs);
         
         /* observation data received */
         if (ret==1) {
@@ -416,6 +421,7 @@ static void *rtksvrthread(void *arg)
         for (i=0;i<3;i++) {
             if (svr->format[i]==STRFMT_SP3||svr->format[i]==STRFMT_RNXCLK) {
                 /* decode download file */
+
                 decodefile(svr,i);
             }
             else {
@@ -435,7 +441,6 @@ static void *rtksvrthread(void *arg)
             rtksvrlock(svr);
             rtkpos(&svr->rtk,obs.data,obs.n,&svr->nav);
             rtksvrunlock(svr);
-            
             if (svr->rtk.sol.stat!=SOLQ_NONE) {
                 
                 /* adjust current time */
@@ -699,7 +704,7 @@ extern int rtksvrstart(rtksvr_t *svr, int cycle, int buffsize, int *strs,
             return 0;
         }
         /* set initial time for rtcm and raw */
-        if (i<3) {
+        if (i<3&&!prcopt->inittime) {
             time=utc2gpst(timeget());
             svr->raw [i].time=strs[i]==STR_FILE?strgettime(svr->stream+i):time;
             svr->rtcm[i].time=strs[i]==STR_FILE?strgettime(svr->stream+i):time;

@@ -30,7 +30,7 @@
 
 static const char rcsid[]="$Id:$";
 
-#define NOUTFILE        7       /* number of output files */
+#define NOUTFILE        8       /* number of output files */
 #define TSTARTMARGIN    60.0    /* time margin for file name replacement */
 
 /* type definition -----------------------------------------------------------*/
@@ -40,6 +40,7 @@ typedef struct {                /* stream file type */
     int    sat;                 /* input satellite */
     obs_t  *obs;                /* input observation data */
     nav_t  *nav;                /* input navigation data */
+    stvec_t  *stvec;            /* input state vector data */
     gtime_t time;               /* current time */
     rtcm_t rtcm;                /* rtcm data */
     raw_t  raw;                 /* receiver raw data */
@@ -210,6 +211,7 @@ static strfile_t *gen_strfile(int format, const char *opt, gtime_t time)
         str->raw.time=time;
         str->obs=&str->raw.obs;
         str->nav=&str->raw.nav;
+        str->stvec=&str->raw.stvec;
         strcpy(str->raw.opt,opt);
     }
     else if (format==STRFMT_RINEX) {
@@ -595,7 +597,7 @@ static int openfile(FILE **ofp, char *files[], const char *file,
     trace(3,"openfile:\n");
     
     for (i=0;i<NOUTFILE;i++) {
-        
+
         if (!*files[i]) continue;
         
         strcpy(path,files[i]);
@@ -823,6 +825,37 @@ static void convsbs(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
         n[3]++;
     }
 }
+/* convert sol message -------------------------------------------------------*/
+static void convstvec(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
+{
+    gtime_t time;
+
+    double ep[6];
+
+    trace(3,"convstvec :\n");
+
+    if (!ofp[7]) return;
+
+    time=str->stvec->time;
+
+    if (!screent(time,opt->ts,opt->te,opt->tint)) return;
+
+    time2epoch(str->stvec->time,ep);
+
+    fprintf(ofp[7],"> %04.0f %2.0f %2.0f %2.0f %2.0f%11.7f  %21s\n",
+                ep[0],ep[1],ep[2],ep[3],ep[4],ep[5],"");
+
+    fprintf(ofp[7], "%14.3lf %14.3lf %14.3lf %14.3lf %14.3lf %14.3lf",
+                str->stvec->rr[0], str->stvec->rr[1], str->stvec->rr[2],
+                str->stvec->rr[3], str->stvec->rr[4], str->stvec->rr[5]);
+
+    fprintf(ofp[7],"\n");
+
+    if (opt->tstart.time==0) opt->tstart=time;
+    opt->tend=time;
+
+    n[7]++;
+}
 /* convert lex message -------------------------------------------------------*/
 static void convlex(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
 {
@@ -953,15 +986,15 @@ static int convrnx_s(int sess, int format, rnxopt_t *opt, const char *file,
         for (j=0;(type=input_strfile(str))>=-1;j++) {
             
             if (j%11==1&&(abort=showstat(sess,te,te,n))) break;
-            
+
             /* avioid duplicated if overlapped data */
             if (tend.time&&timediff(str->time,tend)<=0.0) continue;
-            
             /* convert message */
             switch (type) {
                 case  1: convobs(ofp,opt,str,n,slips); break;
                 case  2: convnav(ofp,opt,str,n);       break;
                 case  3: convsbs(ofp,opt,str,n);       break;
+                case  4: convstvec(ofp,opt,str,n);     break;
                 case 31: convlex(ofp,opt,str,n);       break;
                 case -1: n[NOUTFILE]++; break; /* error */
             }
@@ -1017,6 +1050,7 @@ static int convrnx_s(int sess, int format, rnxopt_t *opt, const char *file,
 *                               ofile[4] rinex qnav file  ("": no output)
 *                               ofile[5] rinex lnav file  ("": no output)
 *                               ofile[6] sbas/lex log file("": no output)
+*                               ofile[7] stvec file       ("": no output)
 * return : status (1:ok,0:error,-1:abort)
 * notes  : the following members of opt are replaced by information in last
 *          converted rinex: opt->tstart, opt->tend, opt->obstype, opt->nobs
@@ -1031,9 +1065,9 @@ extern int convrnx(int format, rnxopt_t *opt, const char *file, char **ofile)
     double tu,ts;
     int i,week,stat=1;
     
-    trace(3,"convrnx: format=%d file=%s ofile=%s %s %s %s %s %s %s\n",
+    trace(3,"convrnx: format=%d file=%s ofile=%s %s %s %s %s %s %s %s\n",
           format,file,ofile[0],ofile[1],ofile[2],ofile[3],ofile[4],ofile[5],
-          ofile[6]);
+          ofile[6], ofile[7]);
     
     showmsg("");
     
@@ -1048,7 +1082,7 @@ extern int convrnx(int format, rnxopt_t *opt, const char *file, char **ofile)
         /* multiple-session */
         tu=opt->tunit<86400.0?opt->tunit:86400.0;
         ts=tu*(int)floor(time2gpst(opt->ts,&week)/tu);
-        
+
         for (i=0;;i++) { /* for each session */
             opt_.ts=gpst2time(week,ts+i*tu);
             opt_.te=timeadd(opt_.ts,tu-DTTOL-0.001);

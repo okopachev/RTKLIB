@@ -28,6 +28,7 @@
 #define ID_X4BTIME  0x4b        /* nvs msg id: GPS/GLONASS/UTC timescale data */
 #define ID_XF7EPH   0xf7        /* nvs msg id: subframe buffer */
 #define ID_XE5BIT   0xe5        /* nvs msg id: bit information */
+#define ID_X88STVEC 0x88        /* nvs msg id: state vector data */
 
 #define ID_XD7ADVANCED 0xd7     /* */
 #define ID_X02RATEPVT  0x02     /* */
@@ -421,21 +422,93 @@ static int decode_x4btime(raw_t *raw)
     
     return 9;
 }
+/* decode NVS x88: state vector data ----------------------------------------*/
+static int decode_x88stvec(raw_t *raw)
+{
+    double latitude, longitude, height;
+    float stdCoord;
+    short timePart1;
+    double timePart2;
+    short week;
+    double velLatitude, velLongitude, velHeight;
+    float deviation;
+    unsigned char status;
+    short prev, sol2d, diff_used, raim, diff_flag;
+
+    unsigned char *p=raw->buff+2;
+
+    long double time = 0;
+
+    trace(4,"decode_x88stvec: len=%d\n",raw->len);
+
+    latitude = R8(p);
+    longitude = R8(p+8);
+    height = R8(p+16);
+    stdCoord = R4(p+24);
+    timePart1 = U2(p+28);
+    timePart2 = R8(p+30);
+    week = I2(p+38);
+    velLatitude = R8(p+40);
+    velLongitude = R8(p+48);
+    velHeight = R8(p+56);
+    deviation = R4(p+64);
+    status = U1(p+68);
+
+    /* check gps week range */
+    if (week>=4096) {
+        trace(2,"nvs xf88stvec week error: week=%d\n",week);
+        return -1;
+    }
+    week=adjgpsweek(week);
+
+    raw->stvec.rr[0] = latitude;
+    raw->stvec.rr[1] = longitude;
+    raw->stvec.rr[2] = height;
+    raw->stvec.rr[3] = velLatitude;
+    raw->stvec.rr[4] = velLongitude;
+    raw->stvec.rr[5] = velHeight;
+
+    raw->stvec.std = stdCoord;
+    raw->stvec.dev = deviation;
+
+    raw->stvec.prev=status&(1<<7)!=0;
+    raw->stvec.sol2d=status&(1<<6)!=0;
+    raw->stvec.diff_used=status&(1<<4)!=0;
+    raw->stvec.raim=status&(1<<3)!=0;
+    raw->stvec.diff_flag=status&(1<<2)!=0;
+
+    switch(sizeof(long double))
+    {
+        case 8:
+            break;
+        case 10:
+            memcpy(&time, &timePart1, 2);
+            memcpy(((char*)&time)+2,&timePart2, 8);
+            break;
+        case 16:
+            memcpy(&time, &timePart1, 2);
+            memcpy(((char*)&time)+8,&timePart2, 8);
+            break;
+    }
+    raw->stvec.time = gpst2time(week, time*0.001);
+
+    return 4;
+}
 /* decode NVS raw message ----------------------------------------------------*/
 static int decode_nvs(raw_t *raw)
 {
     int type=U1(raw->buff+1);
     
     trace(3,"decode_nvs: type=%02x len=%d\n",type,raw->len);
-    
+
     sprintf(raw->msgtype,"NVS: type=%2d len=%3d",type,raw->len);
-    
     switch (type) {
-        case ID_XF5RAW:  return decode_xf5raw (raw);
-        case ID_XF7EPH:  return decode_xf7eph (raw);
-        case ID_XE5BIT:  return decode_xe5bit (raw);
-        case ID_X4AIONO: return decode_x4aiono(raw);
-        case ID_X4BTIME: return decode_x4btime(raw);
+        case ID_XF5RAW:   return decode_xf5raw  (raw);
+        case ID_XF7EPH:   return decode_xf7eph  (raw);
+        case ID_XE5BIT:   return decode_xe5bit  (raw);
+        case ID_X4AIONO:  return decode_x4aiono (raw);
+        case ID_X4BTIME:  return decode_x4btime (raw);
+        case ID_X88STVEC: return decode_x88stvec(raw);
         default: break;
     }
     return 0;
