@@ -422,13 +422,26 @@ static int decode_x4btime(raw_t *raw)
     
     return 9;
 }
+
+/* check for big/little endian */
+int is_big_endian()
+{
+    static const union
+    {
+        int i;
+        char c;
+    } u = {0x12345678};
+
+    return u.c == 0x12;
+}
+
 /* decode NVS x88: state vector data ----------------------------------------*/
-static int decode_x88stvec(raw_t *raw)
+int decode_x88stvec(raw_t *raw)
 {
     double latitude, longitude, height;
     float stdCoord;
-    short timePart1;
-    double timePart2;
+    unsigned short timePart1;
+    unsigned int timePart2, timePart3;
     short week;
     double velLatitude, velLongitude, velHeight;
     float deviation;
@@ -437,7 +450,12 @@ static int decode_x88stvec(raw_t *raw)
 
     unsigned char *p=raw->buff+2;
 
-    long double time = 0;
+    double time = 0;
+    unsigned int bit;
+    short ex;
+    unsigned int resTime1 = 0, resTime2 = 0;
+
+    int i;
 
     trace(4,"decode_x88stvec: len=%d\n",raw->len);
 
@@ -446,7 +464,8 @@ static int decode_x88stvec(raw_t *raw)
     height = R8(p+16);
     stdCoord = R4(p+24);
     timePart1 = U2(p+28);
-    timePart2 = R8(p+30);
+    timePart2 = U4(p+30);
+    timePart3 = U4(p+34);
     week = I2(p+38);
     velLatitude = R8(p+40);
     velLongitude = R8(p+48);
@@ -461,12 +480,12 @@ static int decode_x88stvec(raw_t *raw)
     }
     week=adjgpsweek(week);
 
-    raw->stvec.rr[0] = latitude;
-    raw->stvec.rr[1] = longitude;
-    raw->stvec.rr[2] = height;
-    raw->stvec.rr[3] = velLatitude;
-    raw->stvec.rr[4] = velLongitude;
-    raw->stvec.rr[5] = velHeight;
+    raw->stvec.pos[0] = latitude;
+    raw->stvec.pos[1] = longitude;
+    raw->stvec.pos[2] = height;
+    raw->stvec.vel[3] = velLatitude;
+    raw->stvec.vel[4] = velLongitude;
+    raw->stvec.vel[5] = velHeight;
 
     raw->stvec.std = stdCoord;
     raw->stvec.dev = deviation;
@@ -477,19 +496,60 @@ static int decode_x88stvec(raw_t *raw)
     raw->stvec.raim=status&(1<<3)!=0;
     raw->stvec.diff_flag=status&(1<<2)!=0;
 
-    switch(sizeof(long double))
+
+    bit = (1<<31)&timePart2;
+    if(bit)
+        resTime1=resTime1|(1<<31);
+
+    if(is_big_endian())
+        memcpy(&ex, &timePart2, sizeof(short));
+    else
+        memcpy(&ex, ((void*)&timePart2)+2, sizeof(short));
+
+    ex -= 15360;
+
+    for(i=0;i<11;i++)
     {
-        case 8:
-            break;
-        case 10:
-            memcpy(&time, &timePart1, 2);
-            memcpy(((char*)&time)+2,&timePart2, 8);
-            break;
-        case 16:
-            memcpy(&time, &timePart1, 2);
-            memcpy(((char*)&time)+8,&timePart2, 8);
-            break;
+        bit = ((short)1<<i)&ex;
+        if(bit)
+            resTime1=resTime1|(1<<(i+20));
     }
+    for(i=0;i<15;i++)
+    {
+        bit = (1<<i)&timePart2;
+        if(bit)
+            resTime1=resTime1|(1<<(i+5));
+    }
+    for(i=0;i<5;i++)
+    {
+        bit = (1<<(i+27))&timePart3;
+        if(bit)
+            resTime1=resTime1|(1<<i);
+    }
+    for(i=0;i<27;i++)
+    {
+        bit = (1<<i)&timePart3;
+        if(bit)
+            resTime2=resTime2|(1<<(i+5));
+    }
+    for(i=0;i<5;i++)
+    {
+        bit = ((unsigned short)1<<(i+11))&timePart1;
+        if(bit)
+            resTime2=resTime2|(1<<i);
+    }
+
+    if(is_big_endian())
+    {
+        memcpy(&time, &resTime1, sizeof(unsigned int));
+        memcpy(((void*)&time)+4, &resTime2, sizeof(unsigned int));
+    }
+    else
+    {
+        memcpy(((void*)&time)+4, &resTime1, sizeof(unsigned int));
+        memcpy(&time, &resTime2, sizeof(unsigned int));
+    }
+
     raw->stvec.time = gpst2time(week, time*0.001);
 
     return 4;

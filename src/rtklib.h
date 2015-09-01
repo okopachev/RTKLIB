@@ -825,7 +825,8 @@ typedef struct {        /* navigation data type */
 
 typedef struct {
     gtime_t time;       /* time (GPST) */
-    double rr[6];       /* position/velocity (m|m/s) */
+    double pos[3];      /* latitude/longitude/height (rad | rad | m) */
+    double vel[3];      /* velocity (m) */
     float std;          /* standard deviation of flat coordinates (m) */
     float dev;          /* deviation of the period of the reference oscillator (ms/s) */
     short prev;         /* solution on previous interval is obtained (1 - yes, 2 - no) */

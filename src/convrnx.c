@@ -846,8 +846,8 @@ static void convstvec(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
                 ep[0],ep[1],ep[2],ep[3],ep[4],ep[5],"");
 
     fprintf(ofp[7], "%14.3lf %14.3lf %14.3lf %14.3lf %14.3lf %14.3lf",
-                str->stvec->rr[0], str->stvec->rr[1], str->stvec->rr[2],
-                str->stvec->rr[3], str->stvec->rr[4], str->stvec->rr[5]);
+                str->stvec->pos[0], str->stvec->pos[1], str->stvec->pos[2],
+                str->stvec->vel[3], str->stvec->vel[4], str->stvec->vel[5]);
 
     fprintf(ofp[7],"\n");
 
