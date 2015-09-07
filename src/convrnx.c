@@ -40,7 +40,7 @@ typedef struct {                /* stream file type */
     int    sat;                 /* input satellite */
     obs_t  *obs;                /* input observation data */
     nav_t  *nav;                /* input navigation data */
-    stvec_t  *stvec;            /* input state vector data */
+    pvt_t  *pvt;                /* input PVT vector data */
     gtime_t time;               /* current time */
     rtcm_t rtcm;                /* rtcm data */
     raw_t  raw;                 /* receiver raw data */
@@ -211,7 +211,7 @@ static strfile_t *gen_strfile(int format, const char *opt, gtime_t time)
         str->raw.time=time;
         str->obs=&str->raw.obs;
         str->nav=&str->raw.nav;
-        str->stvec=&str->raw.stvec;
+        str->pvt=&str->raw.pvt;
         strcpy(str->raw.opt,opt);
     }
     else if (format==STRFMT_RINEX) {
@@ -836,18 +836,18 @@ static void convstvec(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
 
     if (!ofp[7]) return;
 
-    time=str->stvec->time;
+    time=str->pvt->time;
 
     if (!screent(time,opt->ts,opt->te,opt->tint)) return;
 
-    time2epoch(str->stvec->time,ep);
+    time2epoch(str->pvt->time,ep);
 
     fprintf(ofp[7],"> %04.0f %2.0f %2.0f %2.0f %2.0f%11.7f  %21s\n",
                 ep[0],ep[1],ep[2],ep[3],ep[4],ep[5],"");
 
     fprintf(ofp[7], "%14.3lf %14.3lf %14.3lf %14.3lf %14.3lf %14.3lf",
-                str->stvec->pos[0], str->stvec->pos[1], str->stvec->pos[2],
-                str->stvec->vel[3], str->stvec->vel[4], str->stvec->vel[5]);
+                str->pvt->pos[0], str->pvt->pos[1], str->pvt->pos[2],
+                str->pvt->vel[3], str->pvt->vel[4], str->pvt->vel[5]);
 
     fprintf(ofp[7],"\n");
 

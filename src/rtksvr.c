@@ -116,7 +116,7 @@ static void updatefcn(rtksvr_t *svr)
     }
 }
 /* update rtk server struct --------------------------------------------------*/
-static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, stvec_t *stvec, int sat,
+static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, pvt_t *pvt, int sat,
                       sbsmsg_t *sbsmsg, int index, int iobs)
 {
     eph_t *eph1,*eph2,*eph3;
@@ -187,7 +187,7 @@ static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, stvec_t *s
         svr->nmsg[index][3]++;
     }
     else if (ret==4) {
-        svr->stvec=*stvec;
+        svr->pvt=*pvt;
     }
     else if (ret==9) { /* ion/utc parameters */
         if (svr->navsel==index||svr->navsel>=3) {
@@ -265,7 +265,7 @@ static int decoderaw(rtksvr_t *svr, int index)
 {
     obs_t *obs;
     nav_t *nav;
-    stvec_t *stvec;
+    pvt_t *pvt;
     sbsmsg_t *sbsmsg=NULL;
     int i,ret,sat,fobs=0;
     
@@ -292,7 +292,7 @@ static int decoderaw(rtksvr_t *svr, int index)
             ret=input_raw(svr->raw+index,svr->format[index],svr->buff[index][i]);
             obs=&svr->raw[index].obs;
             nav=&svr->raw[index].nav;
-            stvec=&svr->raw[index].stvec;
+            pvt=&svr->raw[index].pvt;
             sat=svr->raw[index].ephsat;
             sbsmsg=&svr->raw[index].sbsmsg;
         }
@@ -303,7 +303,7 @@ static int decoderaw(rtksvr_t *svr, int index)
         }
 #endif
         /* update rtk server */
-        if (ret>0) updatesvr(svr,ret,obs,nav,stvec,sat,sbsmsg,index,fobs);
+        if (ret>0) updatesvr(svr,ret,obs,nav,pvt,sat,sbsmsg,index,fobs);
         
         /* observation data received */
         if (ret==1) {
@@ -399,7 +399,7 @@ static void *rtksvrthread(void *arg)
     
     for (cycle=0;svr->state;cycle++) {
         tick=tickget();
-        
+
         for (i=0;i<3;i++) {
             p=svr->buff[i]+svr->nb[i]; q=svr->buff[i]+svr->buffsize;
             

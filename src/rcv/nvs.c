@@ -28,7 +28,7 @@
 #define ID_X4BTIME  0x4b        /* nvs msg id: GPS/GLONASS/UTC timescale data */
 #define ID_XF7EPH   0xf7        /* nvs msg id: subframe buffer */
 #define ID_XE5BIT   0xe5        /* nvs msg id: bit information */
-#define ID_X88STVEC 0x88        /* nvs msg id: state vector data */
+#define ID_X88PVT   0x88        /* nvs msg id: PVT vector data */
 
 #define ID_XD7ADVANCED 0xd7     /* */
 #define ID_X02RATEPVT  0x02     /* */
@@ -435,8 +435,8 @@ int is_big_endian()
     return u.c == 0x12;
 }
 
-/* decode NVS x88: state vector data ----------------------------------------*/
-int decode_x88stvec(raw_t *raw)
+/* decode NVS x88: PVT vector data ----------------------------------------*/
+int decode_x88pvt(raw_t *raw)
 {
     double latitude, longitude, height;
     float stdCoord;
@@ -480,21 +480,21 @@ int decode_x88stvec(raw_t *raw)
     }
     week=adjgpsweek(week);
 
-    raw->stvec.pos[0] = latitude;
-    raw->stvec.pos[1] = longitude;
-    raw->stvec.pos[2] = height;
-    raw->stvec.vel[3] = velLatitude;
-    raw->stvec.vel[4] = velLongitude;
-    raw->stvec.vel[5] = velHeight;
+    raw->pvt.pos[0] = latitude;
+    raw->pvt.pos[1] = longitude;
+    raw->pvt.pos[2] = height;
+    raw->pvt.vel[3] = velLatitude;
+    raw->pvt.vel[4] = velLongitude;
+    raw->pvt.vel[5] = velHeight;
 
-    raw->stvec.std = stdCoord;
-    raw->stvec.dev = deviation;
+    raw->pvt.std = stdCoord;
+    raw->pvt.dev = deviation;
 
-    raw->stvec.prev=status&(1<<7)!=0;
-    raw->stvec.sol2d=status&(1<<6)!=0;
-    raw->stvec.diff_used=status&(1<<4)!=0;
-    raw->stvec.raim=status&(1<<3)!=0;
-    raw->stvec.diff_flag=status&(1<<2)!=0;
+    raw->pvt.prev=status&(1<<7)!=0;
+    raw->pvt.sol2d=status&(1<<6)!=0;
+    raw->pvt.diff_used=status&(1<<4)!=0;
+    raw->pvt.raim=status&(1<<3)!=0;
+    raw->pvt.diff_flag=status&(1<<2)!=0;
 
 
     bit = (1<<31)&timePart2;
@@ -550,7 +550,7 @@ int decode_x88stvec(raw_t *raw)
         memcpy(&time, &resTime2, sizeof(unsigned int));
     }
 
-    raw->stvec.time = gpst2time(week, time*0.001);
+    raw->pvt.time = gpst2time(week, time*0.001);
 
     return 4;
 }
@@ -563,12 +563,12 @@ static int decode_nvs(raw_t *raw)
 
     sprintf(raw->msgtype,"NVS: type=%2d len=%3d",type,raw->len);
     switch (type) {
-        case ID_XF5RAW:   return decode_xf5raw  (raw);
-        case ID_XF7EPH:   return decode_xf7eph  (raw);
-        case ID_XE5BIT:   return decode_xe5bit  (raw);
-        case ID_X4AIONO:  return decode_x4aiono (raw);
-        case ID_X4BTIME:  return decode_x4btime (raw);
-        case ID_X88STVEC: return decode_x88stvec(raw);
+        case ID_XF5RAW:  return decode_xf5raw (raw);
+        case ID_XF7EPH:  return decode_xf7eph (raw);
+        case ID_XE5BIT:  return decode_xe5bit (raw);
+        case ID_X4AIONO: return decode_x4aiono(raw);
+        case ID_X4BTIME: return decode_x4btime(raw);
+        case ID_X88PVT:  return decode_x88pvt (raw);
         default: break;
     }
     return 0;

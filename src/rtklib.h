@@ -823,7 +823,7 @@ typedef struct {        /* navigation data type */
     lexion_t lexion;    /* LEX ionosphere correction */
 } nav_t;
 
-typedef struct {
+typedef struct {        /* PVT vector data type */
     gtime_t time;       /* time (GPST) */
     double pos[3];      /* latitude/longitude/height (rad | rad | m) */
     double vel[3];      /* velocity (m) */
@@ -834,7 +834,7 @@ typedef struct {
     short diff_used;    /* differential corrections are used (1 - yes, 2 - no) */
     short raim;         /* confirmation by RAIM control (1 - yes, 2 - no) */
     short diff_flag;    /* differential corrections mode on (1 - yes, 2 - no) */
-} stvec_t;
+} pvt_t;
 
 typedef struct {        /* station parameter type */
     char name   [MAXANT]; /* marker name */
@@ -1149,7 +1149,7 @@ typedef struct {        /* receiver raw data control type */
     obs_t obuf;         /* observation data buffer */
     nav_t nav;          /* satellite ephemerides */
     sta_t sta;          /* station parameters */
-    stvec_t stvec;      /* state vector */
+    pvt_t pvt;          /* PVT vector */
     int ephsat;         /* sat number of update ephemeris (0:no satellite) */
     sbsmsg_t sbsmsg;    /* SBAS message */
     char msgtype[256];  /* last message type */
@@ -1249,7 +1249,7 @@ typedef struct {        /* RTK server type */
     char files[3][MAXSTRPATH]; /* download paths {rov,base,corr} */
     obs_t obs[3][MAXOBSBUF]; /* observation data {rov,base,corr} */
     nav_t nav;          /* navigation data */
-    stvec_t stvec;      /* state vector */
+    pvt_t pvt;          /* PVT vector */
     sbsmsg_t sbsmsg[MAXSBSMSG]; /* SBAS message buffer */
     stream_t stream[8]; /* streams {rov,base,corr,sol1,sol2,logr,logb,logc} */
     stream_t *moni;     /* monitor stream */
