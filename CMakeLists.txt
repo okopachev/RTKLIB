@@ -19,6 +19,7 @@ set(BUILD_SYSTEM_COMMON_PATH "${PROJECT_BINARY_DIR}/.cmake")
 set(RELEASE_MAIL_TO "mail@nicetu.spb.ru")
 add_definitions(-DDLL)
 add_definitions(-DTRACE)
+add_definitions(-DENAGLO)
 
 file(GLOB SOURCE_LIB src/*.c)
 file(GLOB SUB_SOURCE_LIB src/rcv/*.c)
