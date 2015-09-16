@@ -37,6 +37,8 @@ if(WIN32)
   add_library(${PROJECT_STATIC_LIBRARY} wsock32 ws2_32 winmm)
 endif()
 
+add_subdirectory(app/rnx2rtkp)
+
 install(TARGETS ${PROJECT_SHARED_LIBRARY} DESTINATION lib EXPORT ${PROJECT_NAME}_targets)
 install(TARGETS ${PROJECT_STATIC_LIBRARY} DESTINATION lib EXPORT ${PROJECT_NAME}_targets)
 install(EXPORT ${PROJECT_NAME}_targets DESTINATION targets)
