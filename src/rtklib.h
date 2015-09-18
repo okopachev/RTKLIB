@@ -1242,7 +1242,7 @@ typedef struct {        /* RTK server type */
     unsigned char *sbuf[2]; /* output buffers {sol1,sol2} */
     unsigned char *pbuf[3]; /* peek buffers {rov,base,corr} */
     sol_t solbuf[MAXSOLBUF]; /* solution buffer */
-    unsigned int nmsg[3][10]; /* input message counts */
+    unsigned int nmsg[3][11]; /* input message counts */
     raw_t  raw [3];     /* receiver raw control {rov,base,corr} */
     rtcm_t rtcm[3];     /* RTCM control {rov,base,corr} */
     gtime_t ftime[3];   /* download time {rov,base,corr} */

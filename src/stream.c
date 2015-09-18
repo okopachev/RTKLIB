@@ -285,7 +285,7 @@ static serial_t *openserial(const char *path, int mode, char *msg)
     tracet(3,"openserial: path=%s mode=%d\n",path,mode);
     
     if (!(serial=(serial_t *)malloc(sizeof(serial_t)))) return NULL;
-    
+
     if ((p=strchr(path,':'))) {
         strncpy(port,path,p-path); port[p-path]='\0';
         sscanf(p,":%d:%d:%c:%d:%s",&brate,&bsize,&parity,&stopb,fctr);
@@ -833,6 +833,7 @@ static socket_t accept_nb(socket_t sock, struct sockaddr *addr, socklen_t *len)
     struct timeval tv={0};
     fd_set rs;
     
+    tv.tv_sec=5;
     FD_ZERO(&rs); FD_SET(sock,&rs);
     if (!select(sock+1,&rs,NULL,NULL,&tv)) return 0;
     return accept(sock,addr,len);
@@ -855,6 +856,7 @@ static int connect_nb(socket_t sock, struct sockaddr *addr, socklen_t len)
     struct timeval tv={0};
     fd_set rs,ws;
     int err,flag;
+    tv.tv_sec=5;
     
     flag=fcntl(sock,F_GETFL,0);
     fcntl(sock,F_SETFL,flag|O_NONBLOCK);
@@ -874,6 +876,7 @@ static int recv_nb(socket_t sock, unsigned char *buff, int n)
     fd_set rs;
     
     FD_ZERO(&rs); FD_SET(sock,&rs);
+    tv.tv_sec=5;
     if (!select(sock+1,&rs,NULL,NULL,&tv)) return 0;
     return recv(sock,(char *)buff,n,0);
 }
@@ -884,6 +887,7 @@ static int send_nb(socket_t sock, unsigned char *buff, int n)
     fd_set ws;
     
     FD_ZERO(&ws); FD_SET(sock,&ws);
+    tv.tv_sec=5;
     if (!select(sock+1,NULL,&ws,NULL,&tv)) return 0;
     return send(sock,(char *)buff,n,0);
 }
@@ -2197,7 +2201,7 @@ extern void strsendcmd(stream_t *str, const char *cmd)
     const char *p=cmd,*q;
     char msg[1024],cmdend[]="\r\n";
     int n,m,ms;
-    
+
     tracet(3,"strsendcmd: cmd=%s\n",cmd);
     
     for (;;) {

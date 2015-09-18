@@ -186,8 +186,9 @@ static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, pvt_t *pvt
         }
         svr->nmsg[index][3]++;
     }
-    else if (ret==4) {
+    else if (ret==4) { /* PVT vecor data */
         svr->pvt=*pvt;
+        svr->nmsg[index][10]++;
     }
     else if (ret==9) { /* ion/utc parameters */
         if (svr->navsel==index||svr->navsel>=3) {

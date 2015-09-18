@@ -496,15 +496,14 @@ int decode_x88pvt(raw_t *raw)
     raw->pvt.raim=status&(1<<3)!=0;
     raw->pvt.diff_flag=status&(1<<2)!=0;
 
-
-    bit = (1<<31)&timePart2;
+    bit = (1<<31)&timePart3;
     if(bit)
         resTime1=resTime1|(1<<31);
 
     if(is_big_endian())
-        memcpy(&ex, &timePart2, sizeof(short));
+        memcpy(&ex, &timePart3, sizeof(short));
     else
-        memcpy(&ex, ((void*)&timePart2)+2, sizeof(short));
+        memcpy(&ex, ((void*)&timePart3)+2, sizeof(short));
 
     ex -= 15360;
 
@@ -516,19 +515,19 @@ int decode_x88pvt(raw_t *raw)
     }
     for(i=0;i<15;i++)
     {
-        bit = (1<<i)&timePart2;
+        bit = (1<<i)&timePart3;
         if(bit)
             resTime1=resTime1|(1<<(i+5));
     }
     for(i=0;i<5;i++)
     {
-        bit = (1<<(i+27))&timePart3;
+        bit = (1<<(i+27))&timePart2;
         if(bit)
             resTime1=resTime1|(1<<i);
     }
     for(i=0;i<27;i++)
     {
-        bit = (1<<i)&timePart3;
+        bit = (1<<i)&timePart2;
         if(bit)
             resTime2=resTime2|(1<<(i+5));
     }
