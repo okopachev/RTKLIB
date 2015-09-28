@@ -29,6 +29,7 @@
 #define ID_XF7EPH   0xf7        /* nvs msg id: subframe buffer */
 #define ID_XE5BIT   0xe5        /* nvs msg id: bit information */
 #define ID_X88PVT   0x88        /* nvs msg id: PVT vector data */
+#define ID_X40ALM   0x40        /* nvs msg id: almanac data */
 
 #define ID_XD7ADVANCED 0xd7     /* */
 #define ID_X02RATEPVT  0x02     /* */
@@ -435,6 +436,93 @@ int is_big_endian()
     return u.c == 0x12;
 }
 
+/* convert 10-byte floating point number to double */
+double convert_R10(unsigned short part1, unsigned int part2, unsigned int part3)
+{
+    double res;
+    unsigned int bit;
+    unsigned int resPart1=0, resPart2=0;
+    short ex;
+    int i;
+
+    if(is_big_endian())
+        bit=((short)1<<15)&part1;
+    else
+        bit=(1<<31)&part3;
+
+    if(bit)
+        resPart1=resPart1|(1<<31);
+
+    if(is_big_endian())
+        memcpy(&ex, &part1, sizeof(short));
+    else
+        memcpy(&ex, ((void*)&part3)+2, sizeof(short));
+
+    ex -= 15360;
+
+    for(i=0;i<11;i++)
+    {
+        bit = ((short)1<<i)&ex;
+        if(bit)
+            resPart1=resPart1|(1<<(i+20));
+    }
+
+    if(is_big_endian())
+    {
+        for(i=0;i<20;i++)
+        {
+            bit=(1<<(i+11))&part2;
+            if(bit)
+                resPart1=resPart1|(1<<i);
+        }
+        for(i=0;i<11;i++)
+        {
+            bit=(1<<i)&part2;
+            if(bit)
+                resPart2=resPart2|(1<<(i+21));
+        }
+        for(i=0;i<21;i++)
+        {
+            bit=(1<<(i+11))&part3;
+            if(bit)
+                resPart2=resPart2|(1<<i);
+        }
+        memcpy(&res, &resPart1, sizeof(unsigned int));
+        memcpy(((void*)&res)+4, &resPart2, sizeof(unsigned int));
+
+    }
+    else
+    {
+        for(i=0;i<15;i++)
+        {
+            bit = (1<<i)&part3;
+            if(bit)
+                resPart1=resPart1|(1<<(i+5));
+        }
+        for(i=0;i<5;i++)
+        {
+            bit = (1<<(i+27))&part2;
+            if(bit)
+                resPart1=resPart1|(1<<i);
+        }
+        for(i=0;i<27;i++)
+        {
+            bit = (1<<i)&part2;
+            if(bit)
+                resPart2=resPart2|(1<<(i+5));
+        }
+        for(i=0;i<5;i++)
+        {
+            bit = ((unsigned short)1<<(i+11))&part1;
+            if(bit)
+                resPart2=resPart2|(1<<i);
+        }
+        memcpy(((void*)&res)+4, &resPart1, sizeof(unsigned int));
+        memcpy(&res, &resPart2, sizeof(unsigned int));
+    }
+    return res;
+}
+
 /* decode NVS x88: PVT vector data ----------------------------------------*/
 int decode_x88pvt(raw_t *raw)
 {
@@ -451,13 +539,8 @@ int decode_x88pvt(raw_t *raw)
     unsigned char *p=raw->buff+2;
 
     double time = 0;
-    unsigned int bit;
-    short ex;
-    unsigned int resTime1 = 0, resTime2 = 0;
 
-    int i;
-
-    trace(4,"decode_x88stvec: len=%d\n",raw->len);
+    trace(4,"decode_x88pvt: len=%d\n",raw->len);
 
     latitude = R8(p);
     longitude = R8(p+8);
@@ -475,7 +558,7 @@ int decode_x88pvt(raw_t *raw)
 
     /* check gps week range */
     if (week>=4096) {
-        trace(2,"nvs xf88stvec week error: week=%d\n",week);
+        trace(2,"nvs xf88pvt week error: week=%d\n",week);
         return -1;
     }
     week=adjgpsweek(week);
@@ -496,63 +579,105 @@ int decode_x88pvt(raw_t *raw)
     raw->pvt.raim=status&(1<<3)!=0;
     raw->pvt.diff_flag=status&(1<<2)!=0;
 
-    bit = (1<<31)&timePart3;
-    if(bit)
-        resTime1=resTime1|(1<<31);
-
-    if(is_big_endian())
-        memcpy(&ex, &timePart3, sizeof(short));
-    else
-        memcpy(&ex, ((void*)&timePart3)+2, sizeof(short));
-
-    ex -= 15360;
-
-    for(i=0;i<11;i++)
-    {
-        bit = ((short)1<<i)&ex;
-        if(bit)
-            resTime1=resTime1|(1<<(i+20));
-    }
-    for(i=0;i<15;i++)
-    {
-        bit = (1<<i)&timePart3;
-        if(bit)
-            resTime1=resTime1|(1<<(i+5));
-    }
-    for(i=0;i<5;i++)
-    {
-        bit = (1<<(i+27))&timePart2;
-        if(bit)
-            resTime1=resTime1|(1<<i);
-    }
-    for(i=0;i<27;i++)
-    {
-        bit = (1<<i)&timePart2;
-        if(bit)
-            resTime2=resTime2|(1<<(i+5));
-    }
-    for(i=0;i<5;i++)
-    {
-        bit = ((unsigned short)1<<(i+11))&timePart1;
-        if(bit)
-            resTime2=resTime2|(1<<i);
-    }
-
-    if(is_big_endian())
-    {
-        memcpy(&time, &resTime1, sizeof(unsigned int));
-        memcpy(((void*)&time)+4, &resTime2, sizeof(unsigned int));
-    }
-    else
-    {
-        memcpy(((void*)&time)+4, &resTime1, sizeof(unsigned int));
-        memcpy(&time, &resTime2, sizeof(unsigned int));
-    }
+    time=convert_R10(timePart1, timePart2, timePart3);
 
     raw->pvt.time = gpst2time(week, time*0.001);
 
     return 4;
 }
+
+/* decode NVS x40: almanac data ----------------------------------------*/
+int decode_x40alm(raw_t *raw)
+{
+    unsigned char *p=raw->buff+2;
+    unsigned char system, prn, health, hn;
+    float e, i0, OMGd, OMG0, omg, m0, af0, af1, af01, taun, tn, Tndot;
+    double a, t0a, Tn;
+    unsigned short wn, na;
+    unsigned short timePart1;
+    unsigned int timePart2, timePart3;
+    double time = 0;
+
+    trace(4,"decode_x40alm: len=%d\n",raw->len);
+
+    system = *p;
+    switch(system) {
+        case 1: /* GPS */
+            prn = *(p+1);
+            health = *(p+2);
+            e = R4(p+4);
+            i0 = R4(p+8);
+            OMGd = R4(p+12);
+            a = R8(p+16);
+            OMG0 = R4(p+24);
+            omg = R4(p+28);
+            m0 = R4(p+32);
+            af0 = R4(p+36);
+            af1 = R4(p+40);
+            af01 = R4(p+44);
+            timePart1 = I2(p+48);
+            timePart2 = U4(p+50);
+            timePart3 = U4(p+54);
+            time = convert_R10(timePart1,timePart2,timePart3);
+            if(is_big_endian())
+                wn = U2(p+72);
+            else
+                wn = U2(p+58);
+
+            wn=adjgpsweek(wn);
+
+            raw->nav.alm[prn-1].toa = gpst2time(wn, time*0.001);
+            raw->nav.alm[prn-1].toas = time*0.001;
+
+            raw->nav.alm[prn-1].A = a;
+            raw->nav.alm[prn-1].M0 = m0;
+            raw->nav.alm[prn-1].OMG0 = OMG0;
+            raw->nav.alm[prn-1].OMGd = OMGd;
+            raw->nav.alm[prn-1].e = e;
+            raw->nav.alm[prn-1].f0 = af0;
+            raw->nav.alm[prn-1].f1 = af1;
+            raw->nav.alm[prn-1].i0 = i0;
+            raw->nav.alm[prn-1].omg = omg;
+            raw->nav.alm[prn-1].sat = prn;
+            raw->nav.alm[prn-1].svh = health;
+            raw->nav.alm[prn-1].week = wn;
+            break;
+        case 2: /* GLONASS */
+          #ifdef ENAGLO
+            prn = *(p+1);
+            health = *(p+2);
+            hn = *(p+3);
+            taun = R4(p+4);
+            OMG0 = R4(p+8);
+            i0 = R4(p+12);
+            e = R4(p+16);
+            omg = R4(p+20);
+            tn = R4(p+24);
+            Tn = R8(p+28);
+            Tndot = R4(p+36);
+            if(is_big_endian())
+                na = U2(p+54);
+            else
+                na = U2(p+40);
+
+            raw->nav.galm[prn-1].sat=prn;
+            raw->nav.galm[prn-1].svh=health;
+            raw->nav.galm[prn-1].Hn=hn;
+            raw->nav.galm[prn-1].tau=taun;
+            raw->nav.galm[prn-1].lambda=OMG0;
+            raw->nav.galm[prn-1].I=i0;
+            raw->nav.galm[prn-1].eps=e;
+            raw->nav.galm[prn-1].omg=omg;
+            raw->nav.galm[prn-1].tn=tn;
+            raw->nav.galm[prn-1].Tn=Tn;
+            raw->nav.galm[prn-1].Tndot=Tndot;
+            raw->nav.galm[prn-1].na=na;
+          #endif
+            break;
+    }
+    return 6;
+}
+
 /* decode NVS raw message ----------------------------------------------------*/
 static int decode_nvs(raw_t *raw)
 {
@@ -568,6 +693,7 @@ static int decode_nvs(raw_t *raw)
         case ID_X4AIONO: return decode_x4aiono(raw);
         case ID_X4BTIME: return decode_x4btime(raw);
         case ID_X88PVT:  return decode_x88pvt (raw);
+        case ID_X40ALM:  return decode_x40alm (raw);
         default: break;
     }
     return 0;

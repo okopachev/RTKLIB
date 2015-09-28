@@ -825,14 +825,14 @@ static void convsbs(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
         n[3]++;
     }
 }
-/* convert sol message -------------------------------------------------------*/
-static void convstvec(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
+/* convert pvt message -------------------------------------------------------*/
+static void convpvt(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
 {
     gtime_t time;
 
     double ep[6];
 
-    trace(3,"convstvec :\n");
+    trace(3,"convpvt :\n");
 
     if (!ofp[7]) return;
 
@@ -994,7 +994,7 @@ static int convrnx_s(int sess, int format, rnxopt_t *opt, const char *file,
                 case  1: convobs(ofp,opt,str,n,slips); break;
                 case  2: convnav(ofp,opt,str,n);       break;
                 case  3: convsbs(ofp,opt,str,n);       break;
-                case  4: convstvec(ofp,opt,str,n);     break;
+                case  4: convpvt(ofp,opt,str,n);     break;
                 case 31: convlex(ofp,opt,str,n);       break;
                 case -1: n[NOUTFILE]++; break; /* error */
             }
@@ -1050,7 +1050,7 @@ static int convrnx_s(int sess, int format, rnxopt_t *opt, const char *file,
 *                               ofile[4] rinex qnav file  ("": no output)
 *                               ofile[5] rinex lnav file  ("": no output)
 *                               ofile[6] sbas/lex log file("": no output)
-*                               ofile[7] stvec file       ("": no output)
+*                               ofile[7] pvt file         ("": no output)
 * return : status (1:ok,0:error,-1:abort)
 * notes  : the following members of opt are replaced by information in last
 *          converted rinex: opt->tstart, opt->tend, opt->obstype, opt->nobs

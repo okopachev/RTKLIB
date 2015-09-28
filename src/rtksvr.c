@@ -190,6 +190,13 @@ static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, pvt_t *pvt
         svr->pvt=*pvt;
         svr->nmsg[index][10]++;
     }
+    else if (ret==6) { /* almanac data */
+        for(i=0;i<NSATGPS;i++)
+            svr->nav.alm[i]=nav->alm[i];
+        for(i=0;i<NSATGLO;i++)
+            svr->nav.galm[i]=nav->galm[i];
+        svr->nmsg[index][11]++;
+    }
     else if (ret==9) { /* ion/utc parameters */
         if (svr->navsel==index||svr->navsel>=3) {
             for (i=0;i<8;i++) svr->nav.ion_gps[i]=nav->ion_gps[i];
@@ -506,6 +513,8 @@ extern int rtksvrinit(rtksvr_t *svr)
     eph_t  eph0 ={0,-1,-1};
     geph_t geph0={0,-1};
     seph_t seph0={0};
+    alm_t alm0  ={0};
+    galm_t galm0={0};
     int i,j;
     
     tracet(3,"rtksvrinit:\n");
@@ -534,16 +543,22 @@ extern int rtksvrinit(rtksvr_t *svr)
     
     if (!(svr->nav.eph =(eph_t  *)malloc(sizeof(eph_t )*MAXSAT *2))||
         !(svr->nav.geph=(geph_t *)malloc(sizeof(geph_t)*NSATGLO*2))||
-        !(svr->nav.seph=(seph_t *)malloc(sizeof(seph_t)*NSATSBS*2))) {
+        !(svr->nav.seph=(seph_t *)malloc(sizeof(seph_t)*NSATSBS*2))||
+        !(svr->nav.alm =(alm_t  *)malloc(sizeof(alm_t)*NSATGPS*2))||
+        !(svr->nav.galm=(galm_t *)malloc(sizeof(galm_t)*NSATGLO*2))) {
         tracet(1,"rtksvrinit: malloc error\n");
         return 0;
     }
     for (i=0;i<MAXSAT *2;i++) svr->nav.eph [i]=eph0;
     for (i=0;i<NSATGLO*2;i++) svr->nav.geph[i]=geph0;
     for (i=0;i<NSATSBS*2;i++) svr->nav.seph[i]=seph0;
+    for (i=0;i<NSATGPS*2;i++) svr->nav.alm[i]=alm0;
+    for (i=0;i<NSATGLO*2;i++) svr->nav.galm[i]=galm0;
     svr->nav.n =MAXSAT *2;
     svr->nav.ng=NSATGLO*2;
     svr->nav.ns=NSATSBS*2;
+    svr->nav.na=NSATGPS*2;
+    svr->nav.nga=NSATGLO*2;
     
     for (i=0;i<3;i++) for (j=0;j<MAXOBSBUF;j++) {
         if (!(svr->obs[i][j].data=(obsd_t *)malloc(sizeof(obsd_t)*MAXOBS))) {
@@ -573,6 +588,8 @@ extern void rtksvrfree(rtksvr_t *svr)
     free(svr->nav.eph );
     free(svr->nav.geph);
     free(svr->nav.seph);
+    free(svr->nav.alm);
+    free(svr->nav.galm);
     for (i=0;i<3;i++) for (j=0;j<MAXOBSBUF;j++) {
         free(svr->obs[i][j].data);
     }

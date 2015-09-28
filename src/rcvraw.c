@@ -742,6 +742,7 @@ extern int init_raw(raw_t *raw)
     obsd_t data0={{0}};
     eph_t  eph0 ={0,-1,-1};
     alm_t  alm0 ={0,-1};
+    galm_t galm0={0,-1};
     geph_t geph0={0,-1};
     seph_t seph0={0};
     sbsmsg_t sbsmsg0={0};
@@ -776,13 +777,15 @@ extern int init_raw(raw_t *raw)
     raw->obuf.data=NULL;
     raw->nav.eph  =NULL;
     raw->nav.alm  =NULL;
+    raw->nav.galm =NULL;
     raw->nav.geph =NULL;
     raw->nav.seph =NULL;
     
     if (!(raw->obs.data =(obsd_t *)malloc(sizeof(obsd_t)*MAXOBS))||
         !(raw->obuf.data=(obsd_t *)malloc(sizeof(obsd_t)*MAXOBS))||
         !(raw->nav.eph  =(eph_t  *)malloc(sizeof(eph_t )*MAXSAT))||
-        !(raw->nav.alm  =(alm_t  *)malloc(sizeof(alm_t )*MAXSAT))||
+        !(raw->nav.alm  =(alm_t  *)malloc(sizeof(alm_t )*NSATGPS))||
+        !(raw->nav.galm =(galm_t *)malloc(sizeof(galm_t)*NSATGLO))||
         !(raw->nav.geph =(geph_t *)malloc(sizeof(geph_t)*NSATGLO))||
         !(raw->nav.seph =(seph_t *)malloc(sizeof(seph_t)*NSATSBS*2))) {
         free_raw(raw);
@@ -791,13 +794,15 @@ extern int init_raw(raw_t *raw)
     raw->obs.n =0;
     raw->obuf.n=0;
     raw->nav.n =MAXSAT;
-    raw->nav.na=MAXSAT;
+    raw->nav.na=NSATGPS;
+    raw->nav.nga=NSATGLO;
     raw->nav.ng=NSATGLO;
     raw->nav.ns=NSATSBS*2;
     for (i=0;i<MAXOBS   ;i++) raw->obs.data [i]=data0;
     for (i=0;i<MAXOBS   ;i++) raw->obuf.data[i]=data0;
     for (i=0;i<MAXSAT   ;i++) raw->nav.eph  [i]=eph0;
-    for (i=0;i<MAXSAT   ;i++) raw->nav.alm  [i]=alm0;
+    for (i=0;i<NSATGPS  ;i++) raw->nav.alm  [i]=alm0;
+    for (i=0;i<NSATGLO  ;i++) raw->nav.galm [i]=galm0;
     for (i=0;i<NSATGLO  ;i++) raw->nav.geph [i]=geph0;
     for (i=0;i<NSATSBS*2;i++) raw->nav.seph [i]=seph0;
     for (i=0;i<MAXSAT;i++) for (j=0;j<NFREQ;j++) {
@@ -827,6 +832,7 @@ extern void free_raw(raw_t *raw)
     free(raw->obuf.data); raw->obuf.data=NULL; raw->obuf.n=0;
     free(raw->nav.eph  ); raw->nav.eph  =NULL; raw->nav.n =0;
     free(raw->nav.alm  ); raw->nav.alm  =NULL; raw->nav.na=0;
+    free(raw->nav.galm ); raw->nav.galm =NULL; raw->nav.nga=0;
     free(raw->nav.geph ); raw->nav.geph =NULL; raw->nav.ng=0;
     free(raw->nav.seph ); raw->nav.seph =NULL; raw->nav.ns=0;
 }
@@ -842,7 +848,7 @@ extern void free_raw(raw_t *raw)
 extern int input_raw(raw_t *raw, int format, unsigned char data)
 {
     trace(5,"input_raw: format=%d data=0x%02x\n",format,data);
-    
+
     switch (format) {
         case STRFMT_OEM4 : return input_oem4 (raw,data);
         case STRFMT_OEM3 : return input_oem3 (raw,data);

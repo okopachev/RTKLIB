@@ -526,6 +526,21 @@ typedef struct {        /* almanac type */
     double f0,f1;       /* SV clock parameters (af0,af1) */
 } alm_t;
 
+typedef struct {        /* GLONASS almanac type */
+    int sat;            /* satellite number */
+    int svh;            /* sv health (0:ok) */
+    int Hn;             /* satellite carrier frequency number */
+    float tau;          /* time scale offset (ms) */
+    float lambda;       /* orbit ascending node longitude (rad) */
+    float I;            /* orbit inclination (rad) */
+    float eps;          /* orbit eccentricity */
+    float omg;          /* orbit ascending node-perigee angle (rad) */
+    float tn;           /* orbit ascending node passing time (ms) */
+    double Tn;          /* draconic period (ms/rev) */
+    float Tndot;        /* draconic period change speed (ms/rev^2) */
+    int na;             /* day number in 4-year period */
+} galm_t;
+
 typedef struct {        /* GPS/QZS/GAL broadcast ephemeris type */
     int sat;            /* satellite number */
     int iode,iodc;      /* IODE,IODC */
@@ -786,7 +801,8 @@ typedef struct {        /* navigation data type */
     int ns,nsmax;       /* number of sbas ephemeris */
     int ne,nemax;       /* number of precise ephemeris */
     int nc,ncmax;       /* number of precise clock */
-    int na,namax;       /* number of almanac data */
+    int na,namax;       /* number of GPS almanac data */
+    int nga,ngamax;     /* number of GLONASS almanac data */
     int nt,ntmax;       /* number of tec grid data */
     int nn,nnmax;       /* number of stec grid data */
     eph_t *eph;         /* GPS/QZS/GAL ephemeris */
@@ -794,7 +810,8 @@ typedef struct {        /* navigation data type */
     seph_t *seph;       /* SBAS ephemeris */
     peph_t *peph;       /* precise ephemeris */
     pclk_t *pclk;       /* precise clock */
-    alm_t *alm;         /* almanac data */
+    alm_t *alm;         /* GPS almanac data */
+    galm_t *galm;       /* GLONASS almanac data */
     tec_t *tec;         /* tec grid data */
     stec_t *stec;       /* stec grid data */
     erp_t  erp;         /* earth rotation parameters */
@@ -1242,7 +1259,7 @@ typedef struct {        /* RTK server type */
     unsigned char *sbuf[2]; /* output buffers {sol1,sol2} */
     unsigned char *pbuf[3]; /* peek buffers {rov,base,corr} */
     sol_t solbuf[MAXSOLBUF]; /* solution buffer */
-    unsigned int nmsg[3][11]; /* input message counts */
+    unsigned int nmsg[3][12]; /* input message counts */
     raw_t  raw [3];     /* receiver raw control {rov,base,corr} */
     rtcm_t rtcm[3];     /* RTCM control {rov,base,corr} */
     gtime_t ftime[3];   /* download time {rov,base,corr} */
