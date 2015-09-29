@@ -1232,6 +1232,36 @@ extern void time2epoch(gtime_t t, double *ep)
     ep[0]=1970+days/1461*4+mon/12; ep[1]=mon%12+1; ep[2]=day+1;
     ep[3]=sec/3600; ep[4]=sec%3600/60; ep[5]=sec%60+t.sec;
 }
+/* day number to calendar day --------------------------------------------------
+* convert day number in 4-year period to calendar day
+* args   : int nd           I   day number in 4-year period
+*          double *ep       O   day {year,month,day}
+* return : none
+* notes  : proper in 1972-2099
+*-----------------------------------------------------------------------------*/
+extern void day2epoch(int nd, double *ep)
+{
+    const int mday[]={ /* # of days in a month */
+        31,29,31,30,31,30,31,31,30,31,30,31,31,28,31,30,31,30,31,31,30,31,30,31,
+        31,28,31,30,31,30,31,31,30,31,30,31,31,28,31,30,31,30,31,31,30,31,30,31
+    };
+    int days,days2,mon,day;
+    gtime_t currentTime=timeget();
+
+    days=(int)(currentTime.time/86400)-730;
+    days2=days%1461;
+    if(abs(days2-nd)>730)
+    {
+        if(days2<nd)
+            days-=1461;
+        else
+            nd+=1461;
+    }
+    for (day=nd%1461,mon=0;mon<48;mon++) {
+        if (day>=mday[mon]) day-=mday[mon]; else break;
+    }
+    ep[0]=1972+days/1461*4+(nd/1461)*4+mon/12; ep[1]=mon%12+1; ep[2]=day+1;
+}
 /* gps time to time ------------------------------------------------------------
 * convert week and tow in gps time to gtime_t struct
 * args   : int    week      I   week number in gps time
