@@ -1330,6 +1330,7 @@ extern int     str2time(const char *s, int i, int n, gtime_t *t);
 extern void    time2str(gtime_t t, char *str, int n);
 extern gtime_t epoch2time(const double *ep);
 extern void    time2epoch(gtime_t t, double *ep);
+extern void    day2epoch(int nd, double *ep);
 extern gtime_t gpst2time(int week, double sec);
 extern double  time2gpst(gtime_t t, int *week);
 extern gtime_t gst2time(int week, double sec);
