@@ -22,6 +22,10 @@ add_definitions(-DDLL)
 add_definitions(-DTRACE)
 add_definitions(-DENAGLO)
 
+if(WIN32)
+  add_definitions(-DDLL)
+endif(WIN32)
+
 file(GLOB SOURCE_LIB src/*.c)
 file(GLOB SUB_SOURCE_LIB src/rcv/*.c)
 
@@ -35,8 +39,8 @@ add_library(${PROJECT_SHARED_LIBRARY} SHARED ${ALL_HEADERS} ${SUB_ALL_HEADERS} $
 add_library(${PROJECT_STATIC_LIBRARY} STATIC ${ALL_HEADERS} ${SUB_ALL_HEADERS} ${SOURCE_LIB} ${SUB_SOURCE_LIB})
 
 if(WIN32)
-  add_library(${PROJECT_SHARED_LIBRARY} wsock32 ws2_32 winmm)
-  add_library(${PROJECT_STATIC_LIBRARY} wsock32 ws2_32 winmm)
+  target_link_libraries(${PROJECT_SHARED_LIBRARY} wsock32 ws2_32 winmm)
+  target_link_libraries(${PROJECT_STATIC_LIBRARY} wsock32 ws2_32 winmm)
 endif(WIN32)
 
 add_subdirectory(app/rnx2rtkp)
