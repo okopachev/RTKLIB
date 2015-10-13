@@ -828,7 +828,8 @@ static void convsbs(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
 /* convert pvt message -------------------------------------------------------*/
 static void convpvt(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
 {
-    gtime_t time;
+    gtime_t time,current;
+    static gtime_t firsttime={0,0};
 
     double ep[6];
 
@@ -840,13 +841,18 @@ static void convpvt(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
 
     if (!screent(time,opt->ts,opt->te,opt->tint)) return;
 
-    time2epoch(str->pvt->time,ep);
+    if(n[7]==0)
+    {
+        current=timeget();
+        if(timediff(time,current)>86400) return;
+        firsttime=time;
+        time2epoch(time,ep);
+        fprintf(ofp[7], "%04.0f %02.0f %02.0f %02.0f %02.0f %02.0f\n",
+                ep[0],ep[1],ep[2],ep[3],ep[4],ep[5]);
+    }
 
-    fprintf(ofp[7],"> %04.0f %2.0f %2.0f %2.0f %2.0f%11.7f  %21s\n",
-                ep[0],ep[1],ep[2],ep[3],ep[4],ep[5],"");
-
-    fprintf(ofp[7], "%14.3lf %14.3lf %14.3lf %14.3lf %14.3lf %14.3lf",
-                str->pvt->pos[0], str->pvt->pos[1], str->pvt->pos[2],
+    fprintf(ofp[7], "%15.7f %14.3lf %14.3lf %14.3lf %11.3lf %11.3lf %11.3lf",
+                timediff(time,firsttime), str->pvt->pos[0], str->pvt->pos[1], str->pvt->pos[2],
                 str->pvt->vel[3], str->pvt->vel[4], str->pvt->vel[5]);
 
     fprintf(ofp[7],"\n");

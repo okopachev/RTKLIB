@@ -600,6 +600,9 @@ int decode_x40alm(raw_t *raw)
 
     trace(4,"decode_x40alm: len=%d\n",raw->len);
 
+    if(raw->len < 42)
+        return 0;
+
     system = *p;
     switch(system) {
         case 1: /* GPS */
@@ -863,7 +866,11 @@ extern int gen_nvs(const char *msg, unsigned char *buff)
     }
     else if (!strcmp(args[0],"CFG-BINR")) {
         for (n=1;(n<narg);n++) {
-            if (sscanf(args[n], "%2x",&byte)) *q++=(unsigned char)byte;
+            if (sscanf(args[n], "%2x",&byte)) {
+                *q++=(unsigned char)byte;
+                if((unsigned char)byte==NVSSYNC)
+                    *q++=(unsigned char)byte;
+            }
         }
     }
     else return 0;
