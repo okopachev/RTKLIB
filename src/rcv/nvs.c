@@ -566,9 +566,9 @@ int decode_x88pvt(raw_t *raw)
     raw->pvt.pos[0] = latitude;
     raw->pvt.pos[1] = longitude;
     raw->pvt.pos[2] = height;
-    raw->pvt.vel[3] = velLatitude;
-    raw->pvt.vel[4] = velLongitude;
-    raw->pvt.vel[5] = velHeight;
+    raw->pvt.vel[0] = velLatitude;
+    raw->pvt.vel[1] = velLongitude;
+    raw->pvt.vel[2] = velHeight;
 
     raw->pvt.std = stdCoord;
     raw->pvt.dev = deviation;

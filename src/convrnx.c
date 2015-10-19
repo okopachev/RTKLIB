@@ -853,7 +853,7 @@ static void convpvt(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
 
     fprintf(ofp[7], "%15.7f %14.3lf %14.3lf %14.3lf %11.3lf %11.3lf %11.3lf",
                 timediff(time,firsttime), str->pvt->pos[0], str->pvt->pos[1], str->pvt->pos[2],
-                str->pvt->vel[3], str->pvt->vel[4], str->pvt->vel[5]);
+                str->pvt->vel[0], str->pvt->vel[1], str->pvt->vel[2]);
 
     fprintf(ofp[7],"\n");
 
