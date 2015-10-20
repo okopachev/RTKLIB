@@ -876,6 +876,9 @@ typedef struct {        /* solution type */
     float  qr[6];       /* position variance/covariance (m^2) */
                         /* {c_xx,c_yy,c_zz,c_xy,c_yz,c_zx} or */
                         /* {c_ee,c_nn,c_uu,c_en,c_nu,c_ue} */
+    float  qvr[6];       /* velocity variance/covariance ((m/c)^2) */
+                        /* {c_vxvx,c_vyvy,c_vzvz,c_vxvy,c_vyvz,c_vzvx} or */
+                        /* {c_veve,c_vnvn,c_vuvu,c_vevn,c_vnvu,c_vuve} */
     double dtr[6];      /* receiver clock bias to time systems (s) */
     unsigned char type; /* type (0:xyz-ecef,1:enu-baseline) */
     unsigned char stat; /* solution status (SOLQ_???) */
