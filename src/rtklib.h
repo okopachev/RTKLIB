@@ -470,6 +470,28 @@ typedef struct {        /* time struct */
     double sec;         /* fraction of second under 1 s */
 } gtime_t;
 
+typedef struct {            /* file control type */
+    FILE *fp;               /* file pointer */
+    FILE *fp_tag;           /* file pointer of tag file */
+    FILE *fp_tmp;           /* temporary file pointer for swap */
+    FILE *fp_tag_tmp;       /* temporary file pointer of tag file for swap */
+    char path[MAXSTRPATH];  /* file path */
+    char openpath[MAXSTRPATH]; /* open file path */
+    int mode;               /* file mode */
+    int timetag;            /* time tag flag (0:off,1:on) */
+    int repmode;            /* replay mode (0:master,1:slave) */
+    int offset;             /* time offset (ms) for slave */
+    gtime_t time;           /* start time */
+    gtime_t wtime;          /* write time */
+    unsigned int tick;      /* start tick */
+    unsigned int tick_f;    /* start tick in file */
+    unsigned int fpos;      /* current file position */
+    double start;           /* start offset (s) */
+    double speed;           /* replay speed (time factor) */
+    double swapintv;        /* swap interval (hr) (0: no swap) */
+    lock_t lock;            /* lock flag */
+} file_t;
+
 typedef struct {        /* observation data record */
     gtime_t time;       /* receiver sampling time (GPST) */
     unsigned char sat,rcv; /* satellite/receiver number */
