@@ -69,10 +69,10 @@ static int decode_xf5raw(raw_t *raw)
     int dTowInt;
     double dTowUTC, dTowGPS, dTowFrac, L1, P1, D1;
     double gpsutcTimescale;
-    unsigned char rcvTimeScaleCorr, sys, carrNo;
-    int i,j,prn,sat,n=0,nsat,week;
+    unsigned char rcvTimeScaleCorr, sys, carrNo, type, code;
+    int i,j,prn,sat,n=0,nsat,week,index=0,number;
     unsigned char *p=raw->buff+2;
-    char *q,tstr[32],flag;
+    char *q,tstr[32],flag,flag2;
     
     trace(4,"decode_xf5raw: len=%d\n",raw->len);
     
@@ -125,9 +125,19 @@ static int decode_xf5raw(raw_t *raw)
         trace(2,"nvs xf5raw time tag duplicated: time=%s\n",tstr);
         return 0;
     }
+    raw->obs.n=0;
     for (i=0,p+=27;(i<nsat) && (n<MAXOBS); i++,p+=30) {
-        raw->obs.data[n].time  = time;
-        sys = (U1(p)==1)?SYS_GLO:((U1(p)==2)?SYS_GPS:((U1(p)==4)?SYS_SBS:SYS_NONE));
+
+        flag2=0;
+        type=U1(p);
+        if(type==2 || type==34 || type==50 || type==66|| type==82 || type==130 || type==162 || type==194)
+          sys=SYS_GPS;
+        else if(type==1 || type==3 || type==5 || type==6 || type==17 || type==33 || type==49 || type==65 || type==81 || type==129 || type==161 || type==193)
+          sys=SYS_GLO;
+        else if(type==4 || type==68 || type==84)
+          sys=SYS_SBS;
+        else
+          sys=SYS_NONE;
         prn = U1(p+1);
         if (sys == SYS_SBS) prn += 120; /* Correct this */
         if (!(sat=satno(sys,prn))) {
@@ -145,37 +155,123 @@ static int decode_xf5raw(raw_t *raw)
                   sat,L1,P1,D1);
             continue;
         }
-        raw->obs.data[n].SNR[0]=(unsigned char)(I1(p+3)*4.0+0.5);
-        if (sys==SYS_GLO) {
-            raw->obs.data[n].L[0]  =  L1 - toff*(FREQ1_GLO+DFRQ1_GLO*carrNo);
-        } else {
-            raw->obs.data[n].L[0]  =  L1 - toff*FREQ1;
+
+        switch(type)
+        {
+          case 1:
+          case 2:
+          case 4:
+          case 5:
+          case 17:
+          case 129:
+          case 130:
+            index=0;
+            break;
+          case 3:
+          case 6:
+          case 33:
+          case 34:
+          case 49:
+          case 50:
+          case 161:
+          case 162:
+            index=1;
+            break;
+          case 66:
+          case 68:
+          case 82:
+          case 84:
+          case 193:
+          case 194:
+            index=2;
+            break;
+          default:
+            index=0;
+            break;
         }
-        raw->obs.data[n].P[0]    = (P1-dTowFrac)*CLIGHT*0.001 - toff*CLIGHT; /* in ms, needs to be converted */
-        raw->obs.data[n].D[0]    =  (float)D1;
+
+        switch(type)
+        {
+          case 1:
+          case 2:
+            code = CODE_L1C;
+            break;
+          case 5:
+          case 17:
+            code = CODE_L1P;
+            break;
+          case 3:
+          case 33:
+          case 34:
+          case 50:
+            code = CODE_L2C;
+            break;
+          case 6:
+          case 49:
+            code = CODE_L2P;
+            break;
+          case 66:
+          case 68:
+          case 82:
+          case 84:
+          case 193:
+          case 194:
+            code = CODE_L3I;
+            break;
+          default:
+            code = CODE_L1C;
+        }
+
+        number=n;
+        for(j=0; j<n; j++)
+          if(raw->obs.data[j].sat==sat)
+          {
+            number=j;
+            flag2=1;
+            break;
+          }
+
+        if(flag2==0)
+          for (j=0;j<NFREQ+NEXOBS;j++) {
+              raw->obs.data[number].L[j]=raw->obs.data[number].P[j]=0.0;
+              raw->obs.data[number].D[j]=0.0;
+              raw->obs.data[number].SNR[j]=raw->obs.data[number].LLI[j]=0;
+              raw->obs.data[number].code[j]=CODE_NONE;
+          }
+        else;
+          if ((code==CODE_L1C || code==CODE_L2C) && (raw->obs.data[number].code[index]==CODE_L1P || raw->obs.data[number].code[index]==CODE_L2P))
+            continue;
+
+        raw->obs.data[number].time  = time;
+        raw->obs.data[number].SNR[index]=(unsigned char)(I1(p+3)*4.0+0.5);
+
+        if (sys==SYS_GLO) {
+            raw->obs.data[number].L[index]  =  L1 - toff*(FREQ1_GLO+DFRQ1_GLO*carrNo);
+        } else {
+            raw->obs.data[number].L[index]  =  L1 - toff*FREQ1;
+        }
+        raw->obs.data[number].P[index]    = (P1-dTowFrac)*CLIGHT*0.001 - toff*CLIGHT; /* in ms, needs to be converted */
+        raw->obs.data[number].D[index]    =  (float)D1;
         
+        raw->obs.data[number].code[index] = code;
+
         /* set LLI if meas flag 4 (carrier phase present) off -> on */
         flag=U1(p+28);
-        raw->obs.data[n].LLI[0]=(flag&0x08)&&!(raw->halfc[sat-1][0]&0x08)?1:0;
-        raw->halfc[sat-1][0]=flag;
+        raw->obs.data[number].LLI[index]=(flag&0x08)&&!(raw->halfc[sat-1][index]&0x08)?1:0;
+        raw->halfc[sat-1][index]=flag;
         
 #if 0
-        if (raw->obs.data[n].SNR[0] > 160) {
+        if (raw->obs.data[number].SNR[index] > 160) {
             time2str(time,tstr,3);
             trace(2,"%s, obs.data[%d]: SNR=%.3f  LLI=0x%02x\n",  tstr,
-                n, (raw->obs.data[n].SNR[0])/4.0, U1(p+28) );
+                n, (raw->obs.data[number].SNR[index])/4.0, U1(p+28) );
         }
 #endif
-        raw->obs.data[n].code[0] = CODE_L1C;
-        raw->obs.data[n].sat = sat;
+
+        raw->obs.data[number].sat = sat;
         
-        for (j=1;j<NFREQ+NEXOBS;j++) {
-            raw->obs.data[n].L[j]=raw->obs.data[n].P[j]=0.0;
-            raw->obs.data[n].D[j]=0.0;
-            raw->obs.data[n].SNR[j]=raw->obs.data[n].LLI[j]=0;
-            raw->obs.data[n].code[j]=CODE_NONE;
-        }
-        n++;
+        if(flag2==0)
+          n++;
     }
     raw->time=time;
     raw->obs.n=n;
