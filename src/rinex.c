@@ -435,7 +435,10 @@ static void decode_obsh(FILE *fp, char *buff, double ver, int *tsys,
         }
     }
     else if (strstr(label,"LEAP SECONDS"        )) { /* opt */
-        if (nav) nav->leaps=(int)str2num(buff,0,6);
+        if (nav) {
+            nav->leaps=(int)str2num(buff,0,6);
+            set_leaps(nav->leaps);
+        }
     }
     else if (strstr(label,"# OF SALTELLITES"    )) ; /* opt */
     else if (strstr(label,"PRN / # OF OBS"      )) ; /* opt */
@@ -528,7 +531,10 @@ static void decode_navh(char *buff, nav_t *nav)
         }
     }
     else if (strstr(label,"LEAP SECONDS"        )) { /* opt */
-        if (nav) nav->leaps=(int)str2num(buff,0,6);
+        if (nav) {
+            nav->leaps=(int)str2num(buff,0,6);
+            set_leaps(nav->leaps);
+        }
     }
 }
 /* decode gnav header --------------------------------------------------------*/
@@ -540,7 +546,11 @@ static void decode_gnavh(char *buff, nav_t *nav)
     
     if      (strstr(label,"CORR TO SYTEM TIME"  )) ; /* opt */
     else if (strstr(label,"LEAP SECONDS"        )) { /* opt */
-        if (nav) nav->leaps=(int)str2num(buff,0,6);
+        if (nav)
+        {
+            nav->leaps=(int)str2num(buff,0,6);
+            set_leaps(nav->leaps);
+        }
     }
 }
 /* decode geo nav header -----------------------------------------------------*/
@@ -553,7 +563,11 @@ static void decode_hnavh(char *buff, nav_t *nav)
     if      (strstr(label,"CORR TO SYTEM TIME"  )) ; /* opt */
     else if (strstr(label,"D-UTC A0,A1,T,W,S,U" )) ; /* opt */
     else if (strstr(label,"LEAP SECONDS"        )) { /* opt */
-        if (nav) nav->leaps=(int)str2num(buff,0,6);
+        if (nav)
+        {
+            nav->leaps=(int)str2num(buff,0,6);
+            set_leaps(nav->leaps);
+        }
     }
 }
 /* read rinex header ---------------------------------------------------------*/
@@ -1395,6 +1409,7 @@ static int readrnxfp(FILE *fp, gtime_t ts, gtime_t te, double tint,
 {
     double ver;
     int sys,tsys;
+    int stat;
     char tobs[NUMSYS][MAXOBSTYPE][4]={{""}};
     
     trace(3,"readrnxfp: flag=%d index=%d\n",flag,index);
@@ -1407,16 +1422,18 @@ static int readrnxfp(FILE *fp, gtime_t ts, gtime_t te, double tint,
     
     /* read rinex body */
     switch (*type) {
-        case 'O': return readrnxobs(fp,ts,te,tint,opt,index,ver,tsys,tobs,obs);
-        case 'N': return readrnxnav(fp,opt,ver,sys    ,nav);
-        case 'G': return readrnxnav(fp,opt,ver,SYS_GLO,nav);
-        case 'H': return readrnxnav(fp,opt,ver,SYS_SBS,nav);
-        case 'J': return readrnxnav(fp,opt,ver,SYS_QZS,nav); /* extension */
-        case 'L': return readrnxnav(fp,opt,ver,SYS_GAL,nav); /* extension */
-        case 'C': return readrnxclk(fp,opt,index,nav);
+        case 'O': stat=readrnxobs(fp,ts,te,tint,opt,index,ver,tsys,tobs,obs); break;
+        case 'N': stat=readrnxnav(fp,opt,ver,sys    ,nav); break;
+        case 'G': stat=readrnxnav(fp,opt,ver,SYS_GLO,nav); break;
+        case 'H': stat=readrnxnav(fp,opt,ver,SYS_SBS,nav); break;
+        case 'J': stat=readrnxnav(fp,opt,ver,SYS_QZS,nav);  break; /* extension */
+        case 'L': stat=readrnxnav(fp,opt,ver,SYS_GAL,nav);  break; /* extension */
+        case 'C': stat=readrnxclk(fp,opt,index,nav); break;
     }
-    trace(2,"unsupported rinex type ver=%.2f type=%c\n",ver,*type);
-    return 0;
+    set_default_leaps();
+    if(!stat)
+        trace(2,"unsupported rinex type ver=%.2f type=%c\n",ver,*type);
+    return stat;
 }
 /* uncompress and read rinex file --------------------------------------------*/
 static int readrnxfile(const char *file, gtime_t ts, gtime_t te, double tint,

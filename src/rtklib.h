@@ -1375,6 +1375,8 @@ extern void    timeset  (gtime_t t);
 extern double  time2doy (gtime_t t);
 extern double  utc2gmst (gtime_t t, double ut1_utc);
 extern int read_leaps(const char *file);
+extern void set_leaps(int leap);
+extern void set_default_leaps();
 
 extern int adjgpsweek(int week);
 extern unsigned int tickget(void);

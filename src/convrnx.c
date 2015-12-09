@@ -312,6 +312,7 @@ static int open_strfile(strfile_t *str, const char *file)
         if (!open_rnxctr(&str->rnx,str->fp)) {
             showmsg("no rinex file: %s",file);
             fclose(str->fp);
+            set_default_leaps();
             return 0;
         }
     }
@@ -329,6 +330,7 @@ static void close_strfile(strfile_t *str)
         if (str->fp) fclose(str->fp);
     }
     else if (str->format==STRFMT_RINEX) {
+        set_default_leaps();
         if (str->fp) fclose(str->fp);
     }
 }
