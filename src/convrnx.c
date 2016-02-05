@@ -849,7 +849,7 @@ static void convpvt(FILE **ofp, rnxopt_t *opt, strfile_t *str, int *n)
         if(timediff(time,current)>86400) return;
         firsttime=time;
         time2epoch(time,ep);
-        fprintf(ofp[7], "%04.0f %02.0f %02.0f %02.0f %02.0f %02.0f\n",
+        fprintf(ofp[7], "%04.0f %02.0f %02.0f %02.0f %02.0f %02.6f\n",
                 ep[0],ep[1],ep[2],ep[3],ep[4],ep[5]);
     }
 
