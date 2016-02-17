@@ -320,6 +320,8 @@ static int decode_gpsephem(int sat, raw_t *raw)
         trace(2,"nvs gps ephemeris week error: sat=%2d week=%d\n",sat,week);
         return -1;
     }
+    if (raw->time.time==0) return 0;
+
     eph.week=adjgpsweek(week);
     eph.toe=gpst2time(eph.week,eph.toes);
     eph.toc=gpst2time(eph.week,toc);

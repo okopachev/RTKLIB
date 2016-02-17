@@ -226,6 +226,7 @@ static strfile_t *gen_strfile(int format, const char *opt, gtime_t time)
     str->format=format;
     str->sat=0;
     str->fp=NULL;
+    str->time=time;
     return str;
 }
 /* free stream file ----------------------------------------------------------*/
