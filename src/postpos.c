@@ -302,8 +302,14 @@ static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
     double rb[3]={0};
     int i,nobs,n,solstatic,pri[]={0,1,2,3,4,5,1,6};
     
+    outputFiles_t outputFiles;
+    static int timeStatus = 0;
+    static gtime_t firstTime = {0};
+
     trace(3,"procpos : mode=%d\n",mode);
     
+    prepareOutputFiles(&outputFiles, popt);
+
     solstatic=sopt->solstatic&&
               (popt->mode==PMODE_STATIC||popt->mode==PMODE_PPP_STATIC);
     
@@ -319,8 +325,18 @@ static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
         }
         if (n<=0) continue;
         
-        if (!rtkpos(&rtk,obs,n,&navs)) continue;
+        if (!rtkpos(&rtk,obs,n,&navs,&outputFiles)) continue;
         
+        if(!timeStatus)
+        {
+          writeTimeToFile(outputFiles.trajectory, rtk.sol.time);
+          writeTimeToFile(outputFiles.matrix, rtk.sol.time);
+          timeStatus = 1;
+          firstTime = rtk.sol.time;
+        }
+        writeTrajectory(outputFiles.trajectory, timediff(rtk.sol.time, firstTime), rtk.sol.rr);
+        writeCovariationMatrix(outputFiles.matrix, timediff(rtk.sol.time, firstTime), rtk.sol.qr, rtk.sol.qvr);
+
         if (mode==0) { /* forward/backward */
             if (!solstatic) {
                 outsol(fp,&rtk.sol,rtk.rb,sopt);
@@ -334,13 +350,21 @@ static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
             }
         }
         else if (!revs) { /* combined-forward */
-            if (isolf>=nepoch) return;
+            if (isolf>=nepoch)
+            {
+              closeOutputFiles(&outputFiles);
+              return;
+            }
             solf[isolf]=rtk.sol;
             for (i=0;i<3;i++) rbf[i+isolf*3]=rtk.rb[i];
             isolf++;
         }
         else { /* combined-backward */
-            if (isolb>=nepoch) return;
+            if (isolb>=nepoch)
+            {
+              closeOutputFiles(&outputFiles);
+              return;
+            }
             solb[isolb]=rtk.sol;
             for (i=0;i<3;i++) rbb[i+isolb*3]=rtk.rb[i];
             isolb++;
@@ -351,6 +375,7 @@ static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
         outsol(fp,&sol,rb,sopt);
     }
     rtkfree(&rtk);
+    closeOutputFiles(&outputFiles);
 }
 /* validation of combined solutions ------------------------------------------*/
 static int valcomb(const sol_t *solf, const sol_t *solb)

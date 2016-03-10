@@ -158,6 +158,14 @@ int main(int argc, char **argv)
         else if (*argv[i]=='-') printhelp();
         else if (n<MAXFILE) infile[n++]=argv[i];
     }
+    prcopt.outambiguity=1;
+    prcopt.outclock=1;
+    prcopt.outexcludedsats=1;
+    prcopt.outincludedsats=1;
+    prcopt.outionosphere=1;
+    prcopt.outmeasures=1;
+    prcopt.outresiduals=1;
+    prcopt.outtroposphere=1;
     if (n<=0) {
         showmsg("error : no input file");
         return -2;

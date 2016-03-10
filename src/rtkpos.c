@@ -1772,7 +1772,7 @@ extern void rtkfree(rtk_t *rtk)
 * notes  : before calling function, base station position rtk->sol.rb[] should
 *          be properly set for relative mode except for moving-baseline
 *-----------------------------------------------------------------------------*/
-extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
+extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, outputFiles_t *files)
 {
     prcopt_t *opt=&rtk->opt;
     sol_t solb={{0}};
@@ -1812,7 +1812,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     }
     /* precise point positioning */
     if (opt->mode>=PMODE_PPP_KINEMA) {
-        pppos(rtk,obs,nu,nav);
+        pppos(rtk,obs,nu,nav,files->residuals);
         pppoutsolstat(rtk,statlevel,fp_stat);
         return 1;
     }

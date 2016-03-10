@@ -878,12 +878,15 @@ static double prectrop(gtime_t time, const double *pos, const double *azel,
 static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
                    const double *dts, const double *vare, const int *svh,
                    const nav_t *nav, const double *x, rtk_t *rtk, double *v,
-                   double *H, double *R, double *azel)
+                   double *H, double *R, double *azel, FILE *outputResiduals)
 {
     prcopt_t *opt=&rtk->opt;
     double r,rr[3],disp[3],pos[3],e[3],meas[2],dtdx[3],dantr[NFREQ]={0};
     double dants[NFREQ]={0},var[MAXOBS*2],dtrp=0.0,vart=0.0,varm[2]={0};
     int i,j,k,sat,sys,nv=0,nx=rtk->nx,brk,tideopt;
+
+    static int timeStatus = 0;
+    static gtime_t firstTime = {0};
     
     trace(3,"res_ppp : n=%d nx=%d\n",n,nx);
     
@@ -993,6 +996,18 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
                 continue;
             }
             if (j==0) rtk->ssat[sat-1].vsat[0]=1;
+
+            if(outputResiduals && !timeStatus)
+            {
+              timeStatus = 1;
+              firstTime = obs[i].time;
+              writeTimeToFile(outputResiduals, firstTime);
+            }
+            if (outputResiduals && j==1)
+            {
+              writeResiduals(outputResiduals, timediff(obs[i].time, firstTime), obs[i].sat, v[nv], v[nv - 1]);
+            }
+
             nv++;
         }
     }
@@ -1011,7 +1026,7 @@ extern int pppnx(const prcopt_t *opt)
     return NX(opt);
 }
 /* precise point positioning -------------------------------------------------*/
-extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
+extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, FILE* outputResiduals)
 {
     const prcopt_t *opt=&rtk->opt;
     double *rs,*dts,*var,*v,*H,*R,*azel,*xp,*Pp;
@@ -1042,7 +1057,7 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     for (i=0;i<rtk->opt.niter;i++) {
         
         /* phase and code residuals */
-        if ((nv=res_ppp(i,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel))<=0) break;
+        if ((nv=res_ppp(i,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel,NULL))<=0) break;
         
         /* measurement update */
         matcpy(Pp,rtk->P,rtk->nx,rtk->nx);
@@ -1058,7 +1073,7 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     }
     if (stat==SOLQ_PPP) {
         /* postfit residuals */
-        res_ppp(1,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel);
+        res_ppp(1,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel,outputResiduals);
         
         /* update state and covariance matrix */
         matcpy(rtk->x,xp,rtk->nx,1);

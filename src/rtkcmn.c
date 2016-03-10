@@ -1464,7 +1464,7 @@ extern int read_leaps(const char *file)
 }
 extern void set_leaps(int leap)
 {
-    int i;printf("Setting leaps= %i\n", leap);
+    int i;
 
     for (i=0;leaps[i][0]>0;i++) {
         leaps[i][6]=-leap;
@@ -3849,3 +3849,150 @@ extern int input_lexrf(raw_t *raw, FILE *fp) {return 0;}
 extern int gen_lexr(const char *msg, unsigned char *buff) {return 0;}
 #endif /* EXTLEX */
 
+extern void prepareOutputFiles(outputFiles_t *files, prcopt_t *prcopt)
+{
+  memset(files, 0, sizeof(outputFiles_t));
+
+  files->trajectory = fopen("tr_pso_gosk.txt", "w");
+  files->matrix = fopen("cov_pso_gosk.txt", "w");
+
+  fprintf(files->trajectory, "%% tr_pso_gosk.txt T X Y Z Vx Vy Vz\n");
+  fprintf(files->matrix, "%% cov_pso_gosk.txt T qr(11) qr(12) qr(13) qr(14) qr(15) qr(16) qr(22) qr(23) qr(24) qr(25) qr(26) qr(33) qr(34) qr(35) qr(36) qr(44) qr(45) qr(46) qr(55) qr(56) qr(66)\n");
+
+  if(prcopt->outresiduals)
+  {
+    files->residuals = fopen("residual.txt", "w");
+    fprintf(files->residuals, "%% residuals.txt T Nsv delta_C1 delta_L1\n");
+  }
+
+  if(prcopt->outclock)
+  {
+    files->clock = fopen("clock.txt", "w");
+    fprintf(files->clock, "%% clock.txt T delta_t delta_f/f\n");
+  }
+
+  if(prcopt->outambiguity)
+  {
+    files->ambiguity = fopen("ambiguity.txt", "w");
+    fprintf(files->ambiguity, "%% ambiguity.txt T Nsv amb_L1 sigma_amb_L1 amb_L2 sigma_amb_L2\n");
+  }
+
+  if(prcopt->outionosphere)
+  {
+    files->ionosphere = fopen("ionosphere.txt", "w");
+    fprintf(files->ionosphere, "%% ionosphere.txt T Nsv Azsv Elsv Bsv Lsv Hsv S_TEC VS_TEC\n");
+  }
+
+  if(prcopt->outtroposphere)
+  {
+    files->troposphere = fopen("troposphere.txt", "w");
+    fprintf(files->troposphere, "%% troposphere.txt T Nsv delta_Ttro Vdelta_Ttro*e-8\n");
+  }
+
+  if(prcopt->outmeasures)
+  {
+    files->measures = fopen("out_Nsv.txt", "w");
+    fprintf(files->measures, "%% out_Nsv.txt T Nsv ant code_L1 freq_L1 status_L1 TpFD_L1 C_L1 L_L1 D_L1 code_L2 freq_L2 status_L2 TpFD_L2 C_L2 L_L2 D_L2\n");
+  }
+
+  if(prcopt->outincludedsats)
+  {
+    files->includedSats = fopen("SVinclud.txt", "w");
+    fprintf(files->includedSats, "%% SVinclud.txt\n");
+  }
+
+  if(prcopt->outexcludedsats)
+  {
+    files->excludedSats = fopen("SVexclud.txt", "w");
+    fprintf(files->excludedSats, "%% SVexclud.txt\n");
+  }
+}
+
+extern void closeOutputFiles(outputFiles_t* files)
+{
+  if(files->ambiguity) fclose(files->ambiguity);
+  if(files->clock) fclose(files->clock);
+  if(files->excludedSats) fclose(files->excludedSats);
+  if(files->includedSats) fclose(files->includedSats);
+  if(files->ionosphere) fclose(files->ionosphere);
+  if(files->matrix) fclose(files->matrix);
+  if(files->measures) fclose(files->measures);
+  if(files->residuals) fclose(files->residuals);
+  if(files->trajectory) fclose(files->trajectory);
+  if(files->troposphere) fclose(files->troposphere);
+}
+
+extern void writeTimeToFile(FILE* output, gtime_t time)
+{
+  double epoch[6];
+
+  time2epoch(time, epoch);
+  fprintf(output, "%% %04.0f %02.0f %02.0f %02.0f %02.0f %02.7f\n", epoch[0], epoch[1], epoch[2], epoch[3], epoch[4], epoch[5]);
+}
+
+extern void writeLineToFile(FILE* output, int* symbols_count, int* precisions, int n, ...)
+{
+  int i;
+  double value;
+  char format_string[20];
+  va_list vl;
+
+  va_start(vl, n);
+  for(i = 0; i < n; i++)
+  {
+    value = va_arg(vl, double);
+    sprintf(format_string, "%%0%i.%ilf ", symbols_count[i], precisions[i]);
+    fprintf(output, format_string, value);
+  }
+  va_end(vl);
+  fprintf(output, "\n");
+}
+
+extern void writeTrajectory(FILE* output, double timeDiff, double* position)
+{
+  int symbolsCount[7];
+  int precisions[7];
+  int i;
+
+  for(i = 0; i < 7; i++)
+  {
+    symbolsCount[i] = 12;
+    precisions[i] = 6;
+  }
+
+  writeLineToFile(output, symbolsCount, precisions, 7, timeDiff, position[0], position[1], position[2], position[3], position[4], position[5]);
+}
+
+extern void writeCovariationMatrix(FILE* output, double timeDiff, float* positionMatrix, float* velocityMatrix)
+{
+  int symbolsCount[22];
+  int precisions[22];
+  int i;
+
+  for(i = 0; i < 22; i++)
+  {
+    symbolsCount[i] = 12;
+    precisions[i] = 6;
+  }
+
+  writeLineToFile(output, symbolsCount, precisions, 22, timeDiff, (double)positionMatrix[0], (double)positionMatrix[3], (double)positionMatrix[5], 0.0, 0.0, 0.0, (double)positionMatrix[1], (double)positionMatrix[4], 0.0, 0.0, 0.0, (double)positionMatrix[2], 0.0, 0.0, 0.0, (double)velocityMatrix[0], (double)velocityMatrix[3], (double)velocityMatrix[5], (double)velocityMatrix[1], (double)velocityMatrix[4], (double)velocityMatrix[2]);
+}
+
+extern void writeResiduals(FILE* output, double timeDiff, int satNumber, double codeResidual, double phaseResidual)
+{
+  int symbolsCount[4];
+  int precisions[4];
+  int i;
+
+  symbolsCount[0] = 12;
+  precisions[0] = 6;
+  symbolsCount[1] = 2;
+  precisions[1] = 0;
+  for(i = 2; i < 4; i++)
+  {
+    symbolsCount[i] = 10;
+    precisions[i] = 3;
+  }
+
+  writeLineToFile(output, symbolsCount, precisions, 4, timeDiff, (double)satNumber, codeResidual, phaseResidual);
+}

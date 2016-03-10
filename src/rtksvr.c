@@ -447,7 +447,7 @@ static void *rtksvrthread(void *arg)
             }
             /* rtk positioning */
             rtksvrlock(svr);
-            rtkpos(&svr->rtk,obs.data,obs.n,&svr->nav);
+            rtkpos(&svr->rtk,obs.data,obs.n,&svr->nav,NULL);
             rtksvrunlock(svr);
             if (svr->rtk.sol.stat!=SOLQ_NONE) {
                 

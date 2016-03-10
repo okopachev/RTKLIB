@@ -1067,6 +1067,14 @@ typedef struct {        /* processing options type */
     double odisp[2][6*11]; /* ocean tide loading parameters {rov,base} */
     exterr_t exterr;    /* extended receiver error model */
     int inittime;       /* initialize current time at startup (0:on,1:off) */
+    int outresiduals;
+    int outclock;
+    int outambiguity;
+    int outionosphere;
+    int outtroposphere;
+    int outmeasures;
+    int outincludedsats;
+    int outexcludedsats;
 } prcopt_t;
 
 typedef struct {        /* solution options type */
@@ -1302,6 +1310,19 @@ typedef struct {        /* RTK server type */
     lock_t lock;        /* lock flag */
 } rtksvr_t;
 
+typedef struct {
+  FILE* trajectory;
+  FILE* matrix;
+  FILE* residuals;
+  FILE* clock;
+  FILE* ambiguity;
+  FILE* ionosphere;
+  FILE* troposphere;
+  FILE* measures;
+  FILE* includedSats;
+  FILE* excludedSats;
+} outputFiles_t;
+
 /* global variables ----------------------------------------------------------*/
 extern const double chisqr[];           /* chi-sqr(n) table (alpha=0.001) */
 extern const double lam_carr[];         /* carrier wave length (m) {L1,L2,...} */
@@ -1411,6 +1432,16 @@ extern void freenav(nav_t *nav, int opt);
 extern int  readblq(const char *file, const char *sta, double *odisp);
 extern int  readerp(const char *file, erp_t *erp);
 extern int  geterp (const erp_t *erp, gtime_t time, double *val);
+
+extern void prepareOutputFiles(outputFiles_t *files, prcopt_t *prcopt);
+extern void closeOutputFiles(outputFiles_t* files);
+extern void writeTimeToFile(FILE* output, gtime_t time);
+extern void writeLineToFile(FILE* output, int* symbols_count, int* precisions, int n, ...);
+extern void writeTrajectory(FILE* output, double timeDiff, double* position);
+extern void writeCovariationMatrix(FILE* output, double timeDiff, float* positionMatrix, float* velocityMatrix);
+extern void writeResiduals(FILE* output, double timeDiff, int satNumber, double codeResidual, double phaseResidual);
+extern void outputtofile(const char* filename, gtime_t time, const char* header, int* symbols_count, int* precisions, int n_data, int n_arrays, ...);
+
 
 /* debug trace functions -----------------------------------------------------*/
 extern void traceopen(const char *file);
@@ -1706,12 +1737,12 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
 /* precise positioning -------------------------------------------------------*/
 extern void rtkinit(rtk_t *rtk, const prcopt_t *opt);
 extern void rtkfree(rtk_t *rtk);
-extern int  rtkpos (rtk_t *rtk, const obsd_t *obs, int nobs, const nav_t *nav);
+extern int  rtkpos (rtk_t *rtk, const obsd_t *obs, int nobs, const nav_t *nav, outputFiles_t *files);
 extern int  rtkopenstat(const char *file, int level);
 extern void rtkclosestat(void);
 
 /* precise point positioning -------------------------------------------------*/
-extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav);
+extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, FILE* outputResiduals);
 extern int pppamb(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav,
                   const double *azel);
 extern int pppnx(const prcopt_t *opt);
