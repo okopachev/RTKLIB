@@ -1440,6 +1440,13 @@ extern void writeLineToFile(FILE* output, int* symbols_count, int* precisions, i
 extern void writeTrajectory(FILE* output, double timeDiff, double* position);
 extern void writeCovariationMatrix(FILE* output, double timeDiff, float* positionMatrix, float* velocityMatrix);
 extern void writeResiduals(FILE* output, double timeDiff, int satNumber, double codeResidual, double phaseResidual);
+extern void writeClock(FILE* output, double timeDiff, double deltaT, double deltaF);
+extern void writeAmbiguity(FILE* output, double timeDiff, int satNumber, double ambiguityL1, double ambiguityL2, double sigmaL1, double sigmaL2);
+extern void writeIonosphere(FILE* output, double timeDiff, int satNumber, double azimuth, double elevation, double latitude, double longitude, double height, double s_TEC, double vs_TEC);
+extern void writeTroposphere(FILE* output, double timeDiff, int satNumber, double deltaT, double deltaTdot);
+extern void writeMeasures(FILE* output, double timeDiff, const obsd_t* measure);
+extern void writeIncludedSats(FILE* output, double timeDiff, int n, int* includedSats);
+extern void writeExcludedSats(FILE* output, double timeDiff, int n, int* excludedSats, int* excludeReasons);
 extern void outputtofile(const char* filename, gtime_t time, const char* header, int* symbols_count, int* precisions, int n_data, int n_arrays, ...);
 
 
@@ -1742,7 +1749,7 @@ extern int  rtkopenstat(const char *file, int level);
 extern void rtkclosestat(void);
 
 /* precise point positioning -------------------------------------------------*/
-extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, FILE* outputResiduals);
+extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, outputFiles_t *files);
 extern int pppamb(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav,
                   const double *azel);
 extern int pppnx(const prcopt_t *opt);

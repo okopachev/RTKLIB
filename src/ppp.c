@@ -569,12 +569,15 @@ static int corr_ion(gtime_t time, const nav_t *nav, int sat, const double *pos,
 static int corrmeas(const obsd_t *obs, const nav_t *nav, const double *pos,
                     const double *azel, const prcopt_t *opt,
                     const double *dantr, const double *dants, double phw,
-                    double *meas, double *var, int *brk)
+                    double *meas, double *var, int *brk, outputFiles_t *files)
 {
     const double *lam=nav->lam[obs->sat-1];
     double ion=0.0,L1,P1,PC,P1_P2,P1_C1,vari,gamma;
     int i;
     
+    static int timeStatus = 0;
+    static gtime_t firstTime = {0};
+
     trace(4,"corrmeas:\n");
     
     meas[0]=meas[1]=var[0]=var[1]=0.0;
@@ -607,6 +610,16 @@ static int corrmeas(const obsd_t *obs, const nav_t *nav, const double *pos,
               time_str(obs->time,2),obs->sat,opt->ionoopt);
         return 0;
     }
+
+    if(files && files->ionosphere && !timeStatus)
+    {
+      timeStatus = 1;
+      firstTime = obs->time;
+      writeTimeToFile(files->ionosphere, firstTime);
+    }
+    if(files && files->ionosphere)
+      writeIonosphere(files->ionosphere, timediff(obs[i].time, firstTime), obs->sat, azel[0], azel[1], pos[0], pos[1], pos[2], ion, 0.0);
+
     /* ionosphere and windup corrected phase and code */
     meas[0]=L1+ion-lam[0]*phw;
     meas[1]=PC-ion;
@@ -771,7 +784,7 @@ static void udbias_ppp(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
         sat=obs[i].sat;
         j=IB(sat,&rtk->opt);
         if (!corrmeas(obs+i,nav,pos,rtk->ssat[sat-1].azel,&rtk->opt,NULL,NULL,
-                      0.0,meas,var,&brk)) continue;
+                      0.0,meas,var,&brk,NULL)) continue;
         
         if (brk) {
             rtk->ssat[sat-1].slip[0]=1;
@@ -878,7 +891,7 @@ static double prectrop(gtime_t time, const double *pos, const double *azel,
 static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
                    const double *dts, const double *vare, const int *svh,
                    const nav_t *nav, const double *x, rtk_t *rtk, double *v,
-                   double *H, double *R, double *azel, FILE *outputResiduals)
+                   double *H, double *R, double *azel, outputFiles_t* files)
 {
     prcopt_t *opt=&rtk->opt;
     double r,rr[3],disp[3],pos[3],e[3],meas[2],dtdx[3],dantr[NFREQ]={0};
@@ -905,9 +918,26 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
     ecef2pos(rr,pos);
     
     for (i=0;i<n&&i<MAXOBS;i++) {
+
         sat=obs[i].sat;
         if (!(sys=satsys(sat,NULL))||!rtk->ssat[sat-1].vs) continue;
-        
+
+        if(files && !timeStatus)
+        {
+          timeStatus = 1;
+          firstTime = obs[i].time;
+          if(files->residuals)
+            writeTimeToFile(files->residuals, firstTime);
+          if(files->measures)
+            writeTimeToFile(files->measures, firstTime);
+          if(files->troposphere)
+            writeTimeToFile(files->troposphere, firstTime);
+        }
+        if (files && files->measures)
+        {
+          writeMeasures(files->measures, timediff(obs[i].time, firstTime), &obs[i]);
+        }
+
         /* geometric distance/azimuth/elevation angle */
         if ((r=geodist(rs+i*6,rr,e))<=0.0||
             satazel(pos,e,azel+i*2)<opt->elmin) continue;
@@ -929,6 +959,10 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
         else if (opt->tropopt==TROPOPT_COR||opt->tropopt==TROPOPT_CORG) {
             dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x,dtdx,&vart);
         }
+
+        if(files && files->troposphere)
+          writeTroposphere(files->troposphere, timediff(obs[i].time, firstTime), obs[i].sat, dtrp, 0.0);
+
         /* satellite antenna model */
         if (opt->posopt[0]) {
             satantpcv(rs+i*6,rr,nav->pcvs+sat-1,dants);
@@ -942,7 +976,7 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
         }
         /* ionosphere and antenna phase corrected measurements */
         if (!corrmeas(obs+i,nav,pos,azel+i*2,&rtk->opt,dantr,dants,
-                      rtk->ssat[sat-1].phw,meas,varm,&brk)) {
+                      rtk->ssat[sat-1].phw,meas,varm,&brk,files)) {
             continue;
         }
         /* satellite clock and tropospheric delay */
@@ -997,15 +1031,9 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
             }
             if (j==0) rtk->ssat[sat-1].vsat[0]=1;
 
-            if(outputResiduals && !timeStatus)
+            if (files && files->residuals && j==1)
             {
-              timeStatus = 1;
-              firstTime = obs[i].time;
-              writeTimeToFile(outputResiduals, firstTime);
-            }
-            if (outputResiduals && j==1)
-            {
-              writeResiduals(outputResiduals, timediff(obs[i].time, firstTime), obs[i].sat, v[nv], v[nv - 1]);
+              writeResiduals(files->residuals, timediff(obs[i].time, firstTime), obs[i].sat, v[nv], v[nv - 1]);
             }
 
             nv++;
@@ -1026,7 +1054,7 @@ extern int pppnx(const prcopt_t *opt)
     return NX(opt);
 }
 /* precise point positioning -------------------------------------------------*/
-extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, FILE* outputResiduals)
+extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, outputFiles_t *files)
 {
     const prcopt_t *opt=&rtk->opt;
     double *rs,*dts,*var,*v,*H,*R,*azel,*xp,*Pp;
@@ -1073,7 +1101,7 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, FILE* 
     }
     if (stat==SOLQ_PPP) {
         /* postfit residuals */
-        res_ppp(1,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel,outputResiduals);
+        res_ppp(1,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel,files);
         
         /* update state and covariance matrix */
         matcpy(rtk->x,xp,rtk->nx,1);

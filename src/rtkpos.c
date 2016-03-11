@@ -1812,7 +1812,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
     }
     /* precise point positioning */
     if (opt->mode>=PMODE_PPP_KINEMA) {
-        pppos(rtk,obs,nu,nav,files->residuals);
+        pppos(rtk,obs,nu,nav,files);
         pppoutsolstat(rtk,statlevel,fp_stat);
         return 1;
     }

@@ -3996,3 +3996,154 @@ extern void writeResiduals(FILE* output, double timeDiff, int satNumber, double 
 
   writeLineToFile(output, symbolsCount, precisions, 4, timeDiff, (double)satNumber, codeResidual, phaseResidual);
 }
+
+extern void writeClock(FILE* output, double timeDiff, double deltaT, double deltaF)
+{
+  int symbolsCount[3];
+  int precisions[3];
+  int i;
+
+  symbolsCount[0] = 12;
+  precisions[0] = 6;
+  for(i = 1; i < 3; i++)
+  {
+    symbolsCount[i] = 10;
+    precisions[i] = 0;
+  }
+
+  writeLineToFile(output, symbolsCount, precisions, 3, timeDiff, deltaT, deltaF);
+}
+
+extern void writeAmbiguity(FILE* output, double timeDiff, int satNumber, double ambiguityL1, double ambiguityL2, double sigmaL1, double sigmaL2)
+{
+  int symbolsCount[6];
+  int precisions[6];
+  int i;
+
+  symbolsCount[0] = 12;
+  precisions[0] = 6;
+
+  symbolsCount[1] = 2;
+  precisions[1] = 0;
+
+  for(i = 2; i < 6; i++)
+    precisions[i] = 2;
+
+  symbolsCount[2] = 10;
+  symbolsCount[3] = 5;
+  symbolsCount[4] = 10;
+  symbolsCount[5] = 5;
+
+  writeLineToFile(output, symbolsCount, precisions, 6, timeDiff, (double)satNumber, ambiguityL1, sigmaL1, ambiguityL2, sigmaL2);
+}
+
+extern void writeIonosphere(FILE* output, double timeDiff, int satNumber, double azimuth, double elevation, double latitude, double longitude, double height, double s_TEC, double vs_TEC)
+{
+  int symbolsCount[9];
+  int precisions[9];
+  int i;
+
+  symbolsCount[0] = 12;
+  precisions[0] = 6;
+
+  symbolsCount[1] = 2;
+  precisions[1] = 0;
+
+  for(i = 2; i < 4; i++)
+  {
+    symbolsCount[i] = 5;
+    precisions[i] = 1;
+  }
+  for(i = 4; i < 7; i++)
+  {
+    symbolsCount[i] = 7;
+    precisions[i] = 2;
+  }
+  for(i = 7; i < 9; i++)
+  {
+    symbolsCount[i] = 9;
+    precisions[i] = 4;
+  }
+
+  writeLineToFile(output, symbolsCount, precisions, 9, timeDiff, (double)satNumber, azimuth, elevation, latitude, longitude, height, s_TEC, vs_TEC);
+}
+
+extern void writeTroposphere(FILE* output, double timeDiff, int satNumber, double deltaT, double deltaTdot)
+{
+  int symbolsCount[4];
+  int precisions[4];
+
+  symbolsCount[0] = 12;
+  precisions[0] = 6;
+
+  symbolsCount[1] = 2;
+  precisions[1] = 0;
+
+  symbolsCount[2] = 5;
+  precisions[2] = 0;
+
+  symbolsCount[3] = 6;
+  precisions[3] = 3;
+
+  writeLineToFile(output, symbolsCount, precisions, 4, timeDiff, (double)satNumber, deltaT, deltaTdot);
+}
+
+extern void writeMeasures(FILE* output, double timeDiff, const obsd_t* measure)
+{
+  int symbolsCount[17];
+  int precisions[17];
+  int i;
+
+  symbolsCount[0] = 12;
+  precisions[0] = 6;
+
+  symbolsCount[1] = 2;
+  precisions[1] = 0;
+
+  symbolsCount[2] = 1;
+  precisions[2] = 0;
+
+  for(i = 0; i < 2; i++)
+  {
+    symbolsCount[3 + i*7] = 2;
+    precisions[3 + i*7] = 0;
+
+    symbolsCount[4 + i*7] = 1;
+    precisions[4 + i*7] = 0;
+
+    symbolsCount[5 + i*7] = 1;
+    precisions[5 + i*7] = 0;
+
+    symbolsCount[6 + i*7] = 3;
+    precisions[6 + i*7] = 0;
+
+    symbolsCount[7 + i*7] = 15;
+    precisions[7 + i*7] = 3;
+
+    symbolsCount[8 + i*7] = 10;
+    precisions[8 + i*7] = 3;
+
+    symbolsCount[9 + i*7] = 10;
+    precisions[9 + i*7] = 3;
+  }
+
+  writeLineToFile(output, symbolsCount, precisions, 17, timeDiff, (double)measure->sat, (double)measure->rcv, (double)measure->code[0], 1.0, 1.0, 1.0, measure->P[0], measure->L[0], (double)measure->D[0], (double)measure->code[1], 1.0, 1.0, 1.0, measure->P[1], measure->L[1], (double)measure->D[1]);
+}
+
+extern void writeIncludedSats(FILE* output, double timeDiff, int n, int* includedSats)
+{
+  int i;
+  fprintf(output, "%012.6f %02d ", timeDiff, n);
+  for(i = 0; i < n; i++)
+    fprintf(output, "%02d ", includedSats[i]);
+  fprintf(output, "\n");
+}
+
+extern void writeExcludedSats(FILE* output, double timeDiff, int n, int* excludedSats, int* excludeReasons)
+{
+  int i;
+  fprintf(output, "%012.6f %02d ", timeDiff, n);
+  for(i = 0; i < n; i++)
+    fprintf(output, "%02d %c ", excludedSats[i], excludeReasons[i] == 0 ? 'R' : (excludeReasons[i] == 1 ? 'V' : 'E'));
+  fprintf(output, "\n");
+}
