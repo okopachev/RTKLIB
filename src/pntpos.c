@@ -35,6 +35,8 @@ static const char rcsid[]="$Id:$";
 #define ERR_CBIAS   0.3         /* code bias error std (m) */
 #define REL_HUMI    0.7         /* relative humidity for saastamoinen model */
 
+FILE* output;
+
 /* pseudorange measurement error variance ------------------------------------*/
 static double varerr(const prcopt_t *opt, double el, int sys)
 {
@@ -211,7 +213,11 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
     
     ecef2pos(rr,pos);
     
+    fprintf(output, "      Begin calculating pseudorange residuals\n");
+
     for (i=*ns=0;i<n&&i<MAXOBS;i++) {
+        fprintf(output, "        Satellite %i:\n", obs[i].sat);
+
         vsat[i]=0; azel[i*2]=azel[1+i*2]=resp[i]=0.0;
         
         if (!(sys=satsys(obs[i].sat,NULL))) continue;
@@ -227,9 +233,13 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
         if ((r=geodist(rs+i*6,rr,e))<=0.0||
             satazel(pos,e,azel+i*2)<opt->elmin) continue;
         
+        fprintf(output, "          range = %f, e1 = %f, e2 = %f, e3 = %f, azimuth = %f, elevation = %f\n", r, e[0], e[1], e[2], e[3], azel[0], azel[1]);
+
         /* psudorange with code bias correction */
         if ((P=prange(obs+i,nav,azel+i*2,iter,opt,&vmeas))==0.0) continue;
         
+        fprintf(output, "          Pseudorange = %f\n", P);
+
         /* excluded satellite? */
         if (satexclude(obs[i].sat,svh[i],opt)) continue;
         
@@ -246,9 +256,12 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
                       iter>0?opt->tropopt:TROPOPT_SAAS,&dtrp,&vtrp)) {
             continue;
         }
+        fprintf(output, "          Ionospheric corr. = %f, Tropospheric corr. = %f\n", dion, dtrp);
         /* pseudorange residual */
         v[nv]=P-(r+dtr-CLIGHT*dts[i*2]+dion+dtrp);
         
+        fprintf(output, "          Residual = %f\n", v[nv]);
+
         /* design matrix */
         for (j=0;j<NX;j++) H[j+nv*NX]=j<3?-e[j]:(j==3?1.0:0.0);
         
@@ -273,6 +286,7 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
         for (j=0;j<NX;j++) H[j+nv*NX]=j==i+3?1.0:0.0;
         var[nv++]=0.01;
     }
+    fprintf(output, "      End calculation of residuals, total %i residuals\n", nv);
     return nv;
 }
 /* validate solution ---------------------------------------------------------*/
@@ -320,7 +334,12 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
     
     for (i=0;i<3;i++) x[i]=sol->rr[i];
     
+    fprintf(output, "  Begin coordinates calculation in single point positioning mode\n");
+    fprintf(output, "    Current coordinates: X = %f, Y = %f, Z = %f\n", x[0], x[1], x[2]);
+
     for (i=0;i<MAXITR;i++) {
+
+        fprintf(output, "    Begin iteration %i:\n", i);
         
         /* pseudorange residuals */
         nv=rescode(i,obs,n,rs,dts,vare,svh,nav,x,opt,v,H,var,azel,vsat,resp,
@@ -341,8 +360,12 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
             sprintf(msg,"lsq error info=%d",info);
             break;
         }
+        fprintf(output, "      Results of least square estimation: dx1 = %f, dx2 = %f, dx3 = %f, dx4 = %f, dx5 = %f, dx6 = %f, dx7 = %f\n", dx[0], dx[1], dx[2], dx[3], dx[4], dx[5], dx[6]);
         for (j=0;j<NX;j++) x[j]+=dx[j];
+        fprintf(output, "      New state of vector X: X[0] = %f, X[1] = %f, X[2] = %f, X[3] = %f, X[4] = %f, X[5] = %f, X[6] = %f\n", x[0], x[1], x[2], x[3], x[4], x[5], x[6]);
         
+        fprintf(output, "      norm(dx) = %f\n", norm(dx, NX));
+
         if (norm(dx,NX)<1E-4) {
             sol->type=0;
             sol->time=timeadd(obs[0].time,-x[3]/CLIGHT);
@@ -363,6 +386,7 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
                 sol->stat=opt->sateph==EPHOPT_SBAS?SOLQ_SBAS:SOLQ_SINGLE;
             }
             free(v); free(H); free(var);
+            fprintf(output, "  End of coordinates calculation\n");
             
             return stat;
         }
@@ -458,8 +482,11 @@ static int resdop(const obsd_t *obs, int n, const double *rs, const double *dts,
     trace(3,"resdop  : n=%d\n",n);
     
     ecef2pos(rr,pos); xyz2enu(pos,E);
+    fprintf(output, "      Begin doppler residuals calculation\n");
     
     for (i=0;i<n&&i<MAXOBS;i++) {
+
+        fprintf(output, "        Satellite %i:\n", obs[i].sat);
         
         lam=nav->lam[obs[i].sat-1][0];
         
@@ -480,14 +507,19 @@ static int resdop(const obsd_t *obs, int n, const double *rs, const double *dts,
         rate=dot(vs,e,3)+OMGE/CLIGHT*(rs[4+i*6]*rr[0]+rs[1+i*6]*x[0]-
                                       rs[3+i*6]*rr[1]-rs[  i*6]*x[1]);
         
+        fprintf(output, "          rate = %f\n", rate);
+
         /* doppler residual */
         v[nv]=-lam*obs[i].D[0]-(rate+x[3]-CLIGHT*dts[1+i*2]);
         
+        fprintf(output, "          Residual = %f", v[nv]);
+
         /* design matrix */
         for (j=0;j<4;j++) H[j+nv*4]=j<3?-e[j]:1.0;
         
         nv++;
     }
+    fprintf(output, "      End residuals calculation, total %i residuals\n", nv);
     return nv;
 }
 /* estimate receiver velocity ------------------------------------------------*/
@@ -502,7 +534,11 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
     
     v=mat(n,1); H=mat(4,n);
     
+    fprintf(output, "  Begin velocity calculation\n");
+
     for (i=0;i<MAXITR;i++) {
+
+        fprintf(output, "    Begin iteration %i\n", i);
         
         /* doppler residuals */
         if ((nv=resdop(obs,n,rs,dts,nav,sol->rr,x,azel,vsat,v,H))<4) {
@@ -511,8 +547,13 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
         /* least square estimation */
         if (lsq(H,v,4,nv,dx,Q)) break;
         
+        fprintf(output, "      Results of least square estimation: dx1 = %f, dx2 = %f, dx3 = %f, dx4 = %f\n", dx[0], dx[1], dx[2], dx[3]);
+
         for (j=0;j<4;j++) x[j]+=dx[j];
         
+        fprintf(output, "      Vector V after update: V1=%f, V2 = %f, V3 = %f, V4 = %f\n", x[0], x[1], x[2] ,x[3]);
+        fprintf(output, "      norm(dx) = %f\n", norm(dx, 4));
+
         if (norm(dx,4)<1E-6) {
             for (i=0;i<3;i++) sol->rr[i+3]=x[i];
             for (i=0;i<3;i++) sol->qvr[i] = (float)Q[i+i*4];
@@ -523,6 +564,7 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
         }
     }
     free(v); free(H);
+    fprintf(output, "  End velocity calculation\n");
 }
 /* single-point positioning ----------------------------------------------------
 * compute receiver position, velocity, clock bias by single-point positioning
@@ -548,6 +590,40 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     double *rs,*dts,*var,*azel_,*resp;
     int i,stat,vsat[MAXOBS]={0},svh[MAXOBS];
     
+    double ep[6], ep2[6];
+
+    output = fopen("solution_log.txt", "a");
+
+    fprintf(output, "\nBegin solution in single point positioning mode\n");
+    fprintf(output, "  Input observaton data:\n");
+    for(i = 0; i < n; i++)
+    {
+      time2epoch(obs[i].time, ep);
+      fprintf(output, "    %i) time: %4.0f/%2.0f/%2.0f %2.0f:%2.0f:%6.4f, sat: %i, code: %i, P1: %f, L1: %f, D1: %f, S1: %f, P1: %f, L1: %f, D1: %f, S1: %f\n", i+1, ep[0], ep[1], ep[2], ep[3], ep[4], ep[5], obs[i].sat, obs[i].code, obs[i].P[0], obs[i].L[0], obs[i].D[0], obs[i].SNR[0], obs[i].P[1], obs[i].L[1], obs[i].D[1], obs[i].SNR[1]);
+    }
+    fprintf(output, " Input GPS ephemeris:\n");
+    for(i = 0; i < nav->n; i++)
+    {
+      time2epoch(nav->eph[i].toe, ep);
+      time2epoch(nav->eph[i].toc, ep2);
+      fprintf(output, "    %i) sat: %i, IODE: %i, sva: %i, svh: %i, week: %i, toe: %4.0f/%2.0f/%2.0f %2.0f:%2.0f:%6.4f, toc: %4.0f/%2.0f/%2.0f %2.0f:%2.0f:%6.4f, sqrt(A): %f, E: %f, i0: %f, OMG0: %f, omega: %f, M0: %f, delta_n: %f, OMGdot: %f, Idot: %f, Crc: %f, Crs: %f, Cuc: %f, Cus: %f, Cic: %f, Cis: %f, af0: %f, af1: %f, af2: %f, Tgd: %f\n",
+              i + 1, nav->eph[i].sat, nav->eph[i].iode, nav->eph[i].sva, nav->eph[i].svh, nav->eph[i].week,
+              ep[0], ep[1], ep[2], ep[3], ep[4], ep[5], ep2[0], ep2[1], ep2[2], ep2[3], ep2[4], ep2[5],
+              sqrt(nav->eph[i].A), nav->eph[i].e, nav->eph[i].i0, nav->eph[i].OMG0, nav->eph[i].omg, nav->eph[i].M0,
+              nav->eph[i].deln, nav->eph[i].OMGd, nav->eph[i].idot, nav->eph[i].crc, nav->eph[i].crs,
+              nav->eph[i].cuc, nav->eph[i].cus, nav->eph[i].cic, nav->eph[i].cis, nav->eph[i].f0,
+              nav->eph[i].f0, nav->eph[i].f1, nav->eph[i].f2, nav->eph[i].tgd[0]);
+    }
+    fprintf(output, "  Input GLONASS ephemeris:\n");
+    for(i = 0; i < nav->ng; i++)
+    {
+      time2epoch(nav->geph[i].toe, ep);
+      fprintf(output, "    %i) sat: %i, sva: %i, svh: %i, toe: %4.0f/%2.0f/%2.0f %2.0f:%2.0f:%6.4f, X: %f, Y: %f, Z: %f, VX: %f, VY: %f, VZ: %f, tau_n: %f, gamma_n: %f\n",
+              i + 1, nav->geph[i].sat, nav->geph[i].sva, nav->geph[i].svh, ep[0], ep[1], ep[2], ep[3], ep[4], ep[5],
+              nav->geph[i].pos[0], nav->geph[i].pos[1], nav->geph[i].pos[2],
+              nav->geph[i].vel[0], nav->geph[i].vel[1], nav->geph[i].vel[2], nav->geph[i].taun, nav->geph[i].gamn);
+    }
+
     sol->stat=SOLQ_NONE;
     
     if (n<=0) {strcpy(msg,"no observation data"); return 0;}
@@ -568,6 +644,12 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     /* satellite positons, velocities and clocks */
     satposs(sol->time,obs,n,nav,opt_.sateph,rs,dts,var,svh);
     
+    fprintf(output, "  Satellite positions, velocities and clocks:\n");
+    for(i = 0; i < n; i++)
+    {
+      fprintf(output, "    sat %i: X = %f, Y = %f, Z = %f, VX = %f, VY = %f, VZ = %f, dt = %f, dt_dot = %f\n", obs[i].sat, rs[i*6], rs[i*6 + 1], rs[i*6 + 2], rs[i*6 + 3], rs[i*6 + 4], rs[i*6 + 5], dts[i*2], dts[i*2 + 1]);
+    }
+
     /* estimate receiver position with pseudorange */
     stat=estpos(obs,n,rs,dts,var,svh,nav,&opt_,sol,azel_,vsat,resp,msg);
     
@@ -598,5 +680,7 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         }
     }
     free(rs); free(dts); free(var); free(azel_); free(resp);
+    fprintf(output, "End calculations in single point positioning mode\n");
+    fclose(output);
     return stat;
 }

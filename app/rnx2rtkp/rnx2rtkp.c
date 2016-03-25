@@ -170,6 +170,7 @@ int main(int argc, char **argv)
         showmsg("error : no input file");
         return -2;
     }
+    remove("solution_log.txt");
     ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
     
     if (!ret) fprintf(stderr,"%40s\r","");

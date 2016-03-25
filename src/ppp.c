@@ -78,6 +78,8 @@ extern int dehanttideinel_(double *xsta, int *year, int *mon, int *day,
                            double *dxtide);
 #endif
 
+FILE* output;
+
 /* output solution status for PPP --------------------------------------------*/
 extern void pppoutsolstat(rtk_t *rtk, int level, FILE *fp)
 {
@@ -520,6 +522,9 @@ static int ifmeas(const obsd_t *obs, const nav_t *nav, const double *azel,
         if (dants) meas[k]-=c1*dants[i]+c2*dants[j];
         if (dantr) meas[k]-=c1*dantr[i]+c2*dantr[j];
     }
+    fprintf(output, "        Phase and code pseudoranges are iono-free\n");
+    fprintf(output, "        phase pseudorange = %f, code pseudorange = %f\n", meas[0], meas[1]);
+
     return 1;
 }
 /* get tgd parameter (m) -----------------------------------------------------*/
@@ -632,6 +637,9 @@ static int corrmeas(const obsd_t *obs, const nav_t *nav, const double *pos,
         if (dants) meas[i]-=dants[0];
         if (dantr) meas[i]-=dantr[0];
     }
+    fprintf(output, "        Phase and code pseudoranges are NOT iono-free\n");
+    fprintf(output, "        phase pseudorange = %f, code pseudorange = %f, ionospheric corr = %f\n", meas[0], meas[1], ion);
+
     return 1;
 }
 /* L1/L2 geometry-free phase measurement -------------------------------------*/
@@ -900,6 +908,8 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
 
     static int timeStatus = 0;
     static gtime_t firstTime = {0};
+    int includedSats[MAXSAT], excludedSats[MAXSAT], excludeReasons[MAXSAT];
+    int includedSatsCount = 0, excludedSatsCount = 0;
     
     trace(3,"res_ppp : n=%d nx=%d\n",n,nx);
     
@@ -917,7 +927,11 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
     }
     ecef2pos(rr,pos);
     
+    fprintf(output, "    Begin residuals calculation\n");
+
     for (i=0;i<n&&i<MAXOBS;i++) {
+
+        fprintf(output, "      Satellite %i:\n", obs[i].sat);
 
         sat=obs[i].sat;
         if (!(sys=satsys(sat,NULL))||!rtk->ssat[sat-1].vs) continue;
@@ -942,8 +956,16 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
         if ((r=geodist(rs+i*6,rr,e))<=0.0||
             satazel(pos,e,azel+i*2)<opt->elmin) continue;
         
+        fprintf(output, "        distance = %f, e1 = %f, e2 = %f, e3 = %f, azimuth = %f, elevation = %f\n", r, e[0], e[1], e[2], azel[0], azel[1]);
+
         /* excluded satellite? */
-        if (satexclude(obs[i].sat,svh[i],opt)) continue;
+        if (satexclude(obs[i].sat,svh[i],opt))
+        {
+          excludedSats[excludedSatsCount] = obs[i].sat;
+          excludeReasons[excludedSatsCount] = 2;
+          excludedSatsCount++;
+          continue;
+        }
         
         /* tropospheric delay correction */
         if (opt->tropopt==TROPOPT_SAAS) {
@@ -960,6 +982,8 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
             dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x,dtdx,&vart);
         }
 
+        fprintf(output, "        tropospheric corr. = %f\n", dtrp);
+
         if(files && files->troposphere)
           writeTroposphere(files->troposphere, timediff(obs[i].time, firstTime), obs[i].sat, dtrp, 0.0);
 
@@ -970,6 +994,8 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
         /* receiver antenna model */
         antmodel(opt->pcvr,opt->antdel[0],azel+i*2,opt->posopt[1],dantr);
         
+        fprintf(output, "        antenna corrections: d_L1 = %f, d_L2 = %f\n", dantr[0], dantr[1]);
+
         /* phase windup correction */
         if (opt->posopt[2]) {
             windupcorr(rtk->sol.time,rs+i*6,rr,&rtk->ssat[sat-1].phw);
@@ -982,6 +1008,8 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
         /* satellite clock and tropospheric delay */
         r+=-CLIGHT*dts[i*2]+dtrp;
         
+        fprintf(output, "        corrected distance = %f\n", r);
+
         trace(5,"sat=%2d azel=%6.1f %5.1f dtrp=%.3f dantr=%6.3f %6.3f dants=%6.3f %6.3f phw=%6.3f\n",
               sat,azel[i*2]*R2D,azel[1+i*2]*R2D,dtrp,dantr[0],dantr[1],dants[0],
               dants[1],rtk->ssat[sat-1].phw);
@@ -994,6 +1022,11 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
             
             v[nv]=meas[j]-r;
             
+            if(j == 0)
+              fprintf(output, "        v_phase = %f\n", v[nv]);
+            else
+              fprintf(output, "        v_code = %f\n", v[nv]);
+
             for (k=0;k<3;k++) H[k+nx*nv]=-e[k];
             
             if (sys!=SYS_GLO) {
@@ -1027,9 +1060,20 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
                 trace(2,"ppp outlier rejected %s sat=%2d type=%d v=%.3f\n",
                       time_str(obs[i].time,0),sat,j,v[nv]);
                 rtk->ssat[sat-1].rejc[0]++;
+                excludedSats[excludedSatsCount] = obs[i].sat;
+                if(j == 0)
+                  excludeReasons[excludedSatsCount] = 0;
+                else
+                  excludeReasons[excludedSatsCount] = 1;
+                excludedSatsCount++;
                 continue;
             }
             if (j==0) rtk->ssat[sat-1].vsat[0]=1;
+            if (j==1)
+            {
+              includedSats[includedSatsCount] = obs[i].sat;
+              includedSatsCount++;
+            }
 
             if (files && files->residuals && j==1)
             {
@@ -1039,6 +1083,12 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
             nv++;
         }
     }
+
+    if(files && files->includedSats)
+      writeIncludedSats(files->includedSats, timediff(obs[0].time, firstTime), includedSatsCount, includedSats);
+    if(files && files->excludedSats)
+      writeExcludedSats(files->excludedSats, timediff(obs[0].time, firstTime), excludedSatsCount, excludedSats, excludeReasons);
+
     for (i=0;i<nv;i++) for (j=0;j<nv;j++) {
         R[i+j*nv]=i==j?var[i]:0.0;
     }
@@ -1046,6 +1096,7 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
     trace(5,"v=\n"); tracemat(5,v, 1,nv,8,3);
     trace(5,"H=\n"); tracemat(5,H,nx,nv,8,3);
     trace(5,"R=\n"); tracemat(5,R,nv,nv,8,5);
+    fprintf(output, "    End residuals calculation\n");
     return nv;
 }
 /* number of estimated states ------------------------------------------------*/
@@ -1058,10 +1109,14 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
 {
     const prcopt_t *opt=&rtk->opt;
     double *rs,*dts,*var,*v,*H,*R,*azel,*xp,*Pp;
-    int i,nv,info,svh[MAXOBS],stat=SOLQ_SINGLE;
+    int i,j,nv,info,svh[MAXOBS],stat=SOLQ_SINGLE;
     
     trace(3,"pppos   : nx=%d n=%d\n",rtk->nx,n);
     
+    output = fopen("solution_log.txt", "a");
+
+    fprintf(output, "Begin solution in precise point positioning mode\n");
+
     rs=mat(6,n); dts=mat(2,n); var=mat(1,n); azel=zeros(2,n);
     
     for (i=0;i<MAXSAT;i++) rtk->ssat[i].fix[0]=0;
@@ -1081,9 +1136,15 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
     xp=mat(rtk->nx,1); Pp=zeros(rtk->nx,rtk->nx);
     matcpy(xp,rtk->x,rtk->nx,1);
     nv=n*rtk->opt.nf*2; v=mat(nv,1); H=mat(rtk->nx,nv); R=mat(nv,nv);
+    fprintf(output, "  Current state of vector X:");
+    for(i = 0; i < rtk->nx; i++)
+      fprintf(output, " X[%i] = %f,", i, xp[i]);
+    fprintf(output, "\n");
     
     for (i=0;i<rtk->opt.niter;i++) {
         
+        fprintf(output, "  Begin iteration %i\n", i);
+
         /* phase and code residuals */
         if ((nv=res_ppp(i,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel,NULL))<=0) break;
         
@@ -1097,6 +1158,11 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
         }
         trace(4,"x(%d)=",i+1); tracemat(4,xp,1,NR(opt),13,4);
         
+        fprintf(output, "    Vector X after Kalman filter:");
+        for(j = 0; j < rtk->nx; j++)
+          fprintf(output, " X[%i] = %f,", j, xp[j]);
+        fprintf(output, "\n");
+
         stat=SOLQ_PPP;
     }
     if (stat==SOLQ_PPP) {
@@ -1140,4 +1206,6 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
     }
     free(rs); free(dts); free(var); free(azel);
     free(xp); free(Pp); free(v); free(H); free(R);
+    fprintf(output, "End calculations in precise point positioning mode\n");
+    fclose(output);
 }
