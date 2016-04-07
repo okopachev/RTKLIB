@@ -1196,9 +1196,16 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
         fprintf(output, "    End Kalman filtering\n");
         trace(4,"x(%d)=",i+1); tracemat(4,xp,1,NR(opt),13,4);
         
-        fprintf(output, "    Vector X after Kalman filter:");
+        fprintf(output, "    Vector X after Kalman filter:\n");
         for(j = 0; j < rtk->nx; j++)
-          fprintf(output, " X[%i] = %f,", j, xp[j]);
+        {
+          if(xp[j] == 0) continue;
+          fprintf(output, "      X[%i] = %f", j, xp[j]);
+          if(j >= 5)
+            fprintf(output, " (for satellite %i)\n", j - 4);
+          else
+            fprintf(output, "\n");
+        }
         fprintf(output, "\n");
 
         stat=SOLQ_PPP;

@@ -331,11 +331,13 @@ static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
         {
           writeTimeToFile(outputFiles.trajectory, rtk.sol.time);
           writeTimeToFile(outputFiles.matrix, rtk.sol.time);
+          writeTimeToFile(outputFiles.clock, obs[0].time);
           timeStatus = 1;
           firstTime = rtk.sol.time;
         }
         writeTrajectory(outputFiles.trajectory, timediff(rtk.sol.time, firstTime), rtk.sol.rr);
         writeCovariationMatrix(outputFiles.matrix, timediff(rtk.sol.time, firstTime), rtk.sol.qr, rtk.sol.qvr);
+        writeClock(outputFiles.clock, timediff(rtk.sol.time, firstTime), 1000000000 * timediff(rtk.sol.time, obs[0].time), 0);
 
         if (mode==0) { /* forward/backward */
             if (!solstatic) {

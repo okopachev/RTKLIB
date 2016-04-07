@@ -3857,7 +3857,7 @@ extern void prepareOutputFiles(outputFiles_t *files, prcopt_t *prcopt)
   files->matrix = fopen("cov_pso_gosk.txt", "w");
 
   fprintf(files->trajectory, "%% tr_pso_gosk.txt T X Y Z Vx Vy Vz\n");
-  fprintf(files->matrix, "%% cov_pso_gosk.txt T qr(11) qr(12) qr(13) qr(14) qr(15) qr(16) qr(22) qr(23) qr(24) qr(25) qr(26) qr(33) qr(34) qr(35) qr(36) qr(44) qr(45) qr(46) qr(55) qr(56) qr(66)\n");
+  fprintf(files->matrix, "%% cov_pso_gosk.txt T qr(11) qr(12) qr(13) qr(22) qr(23) qr(33) qr(44) qr(45) qr(46) qr(55) qr(56) qr(66)\n");
 
   if(prcopt->outresiduals)
   {
