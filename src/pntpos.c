@@ -355,11 +355,33 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
             v[j]/=sig;
             for (k=0;k<NX;k++) H[k+j*NX]/=sig;
         }
+        fprintf(output, "      Begin least-square estimation:\n");
+
+        fprintf(output, "       ");
+
+        for(j = 0; j < NX; j++)
+          fprintf(output, " X[%i] = %f,", j, dx[j]);
+        fprintf(output, "\n");
+
+        fprintf(output, "       ");
+        for(j = 0; j < nv; j++)
+          fprintf(output, " v[%i] = %f,", j, v[j]);
+        fprintf(output, "\n");
+
+        for(j = 0; j < nv; j++)
+        {
+          fprintf(output, "       ");
+          for(k = 0; k < NX; k++)
+            fprintf(output, " H[%i][%i] = %f,", j, k, H[k + j * NX]);
+          fprintf(output, "\n");
+        }
+
         /* least square estimation */
         if ((info=lsq(H,v,NX,nv,dx,Q))) {
             sprintf(msg,"lsq error info=%d",info);
             break;
         }
+        fprintf(output, "      End least-square estimation\n");
         fprintf(output, "      Results of least square estimation: dx1 = %f, dx2 = %f, dx3 = %f, dx4 = %f, dx5 = %f, dx6 = %f, dx7 = %f\n", dx[0], dx[1], dx[2], dx[3], dx[4], dx[5], dx[6]);
         for (j=0;j<NX;j++) x[j]+=dx[j];
         fprintf(output, "      New state of vector X: X[0] = %f, X[1] = %f, X[2] = %f, X[3] = %f, X[4] = %f, X[5] = %f, X[6] = %f\n", x[0], x[1], x[2], x[3], x[4], x[5], x[6]);
@@ -599,7 +621,7 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     for(i = 0; i < n; i++)
     {
       time2epoch(obs[i].time, ep);
-      fprintf(output, "    %i) time: %4.0f/%2.0f/%2.0f %2.0f:%2.0f:%6.4f, sat: %i, code: %i, P1: %f, L1: %f, D1: %f, S1: %f, P1: %f, L1: %f, D1: %f, S1: %f\n", i+1, ep[0], ep[1], ep[2], ep[3], ep[4], ep[5], obs[i].sat, obs[i].code, obs[i].P[0], obs[i].L[0], obs[i].D[0], obs[i].SNR[0], obs[i].P[1], obs[i].L[1], obs[i].D[1], obs[i].SNR[1]);
+      fprintf(output, "    %i) time: %4.0f/%2.0f/%2.0f %2.0f:%2.0f:%6.4f, sat: %i, code: %i, P1: %f, L1: %f, D1: %f, S1: %f, P2: %f, L2: %f, D2: %f, S2: %f\n", i+1, ep[0], ep[1], ep[2], ep[3], ep[4], ep[5], obs[i].sat, obs[i].code, obs[i].P[0], obs[i].L[0], obs[i].D[0], obs[i].SNR[0], obs[i].P[1], obs[i].L[1], obs[i].D[1], obs[i].SNR[1]);
     }
     fprintf(output, " Input GPS ephemeris:\n");
     for(i = 0; i < nav->n; i++)

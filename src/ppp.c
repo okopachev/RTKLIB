@@ -1109,7 +1109,7 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
 {
     const prcopt_t *opt=&rtk->opt;
     double *rs,*dts,*var,*v,*H,*R,*azel,*xp,*Pp;
-    int i,j,nv,info,svh[MAXOBS],stat=SOLQ_SINGLE;
+    int i,j,k,nv,info,svh[MAXOBS],stat=SOLQ_SINGLE;
     
     trace(3,"pppos   : nx=%d n=%d\n",rtk->nx,n);
     
@@ -1150,12 +1150,50 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
         
         /* measurement update */
         matcpy(Pp,rtk->P,rtk->nx,rtk->nx);
+
+        fprintf(output, "    Begin Kalman filtering:\n");
+
+        fprintf(output, "     ");
+        for(j = 0; j < rtk->nx; j++)
+          fprintf(output, " X[%i] = %f,", j, xp[j]);
+        fprintf(output, "\n\n");
+
+        for(j = 0; j < rtk->nx; j++)
+        {
+          fprintf(output, "     ");
+          for(k = 0; k < rtk->nx; k++)
+            fprintf(output, " P[%i][%i] = %f,", j, k, Pp[k + j * rtk->nx]);
+          fprintf(output, "\n");
+        }
+        fprintf(output, "\n");
+
+        for(j = 0; j < nv; j++)
+        {
+          fprintf(output, "     ");
+          for(k = 0; k < nv; k++)
+            fprintf(output, " R[%i][%i] = %f,", j, k, R[k + j * nv]);
+          fprintf(output, "\n");
+        }
+
+        fprintf(output, "\n     ");
+        for(j = 0; j < nv; j++)
+          fprintf(output, " v[%i] = %f,", j, v[j]);
+        fprintf(output, "\n\n");
+
+        for(j = 0; j < nv; j++)
+        {
+          fprintf(output, "     ");
+          for(k = 0; k < rtk->nx; k++)
+            fprintf(output, " H[%i][%i] = %f,", j, k, H[k + j * rtk->nx]);
+          fprintf(output, "\n");
+        }
         
         if ((info=filter(xp,Pp,H,v,R,rtk->nx,nv))) {
             trace(2,"ppp filter error %s info=%d\n",time_str(rtk->sol.time,0),
                   info);
             break;
         }
+        fprintf(output, "    End Kalman filtering\n");
         trace(4,"x(%d)=",i+1); tracemat(4,xp,1,NR(opt),13,4);
         
         fprintf(output, "    Vector X after Kalman filter:");

@@ -3965,17 +3965,17 @@ extern void writeTrajectory(FILE* output, double timeDiff, double* position)
 
 extern void writeCovariationMatrix(FILE* output, double timeDiff, float* positionMatrix, float* velocityMatrix)
 {
-  int symbolsCount[22];
-  int precisions[22];
+  int symbolsCount[13];
+  int precisions[13];
   int i;
 
-  for(i = 0; i < 22; i++)
+  for(i = 0; i < 13; i++)
   {
     symbolsCount[i] = 12;
     precisions[i] = 6;
   }
 
-  writeLineToFile(output, symbolsCount, precisions, 22, timeDiff, (double)positionMatrix[0], (double)positionMatrix[3], (double)positionMatrix[5], 0.0, 0.0, 0.0, (double)positionMatrix[1], (double)positionMatrix[4], 0.0, 0.0, 0.0, (double)positionMatrix[2], 0.0, 0.0, 0.0, (double)velocityMatrix[0], (double)velocityMatrix[3], (double)velocityMatrix[5], (double)velocityMatrix[1], (double)velocityMatrix[4], (double)velocityMatrix[2]);
+  writeLineToFile(output, symbolsCount, precisions, 13, timeDiff, (double)positionMatrix[0], (double)positionMatrix[3], (double)positionMatrix[5], (double)positionMatrix[1], (double)positionMatrix[4], (double)positionMatrix[2], (double)velocityMatrix[0], (double)velocityMatrix[3], (double)velocityMatrix[5], (double)velocityMatrix[1], (double)velocityMatrix[4], (double)velocityMatrix[2]);
 }
 
 extern void writeResiduals(FILE* output, double timeDiff, int satNumber, double codeResidual, double phaseResidual)
