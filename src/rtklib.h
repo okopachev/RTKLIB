@@ -447,6 +447,8 @@ extern "C" {
 #define P2_50       8.881784197001252E-16 /* 2^-50 */
 #define P2_55       2.775557561562891E-17 /* 2^-55 */
 
+#define MAXAMB 100
+
 #ifdef WIN32
 #define thread_t    HANDLE
 #define lock_t      CRITICAL_SECTION
@@ -1177,6 +1179,15 @@ typedef struct {        /* ambiguity control type */
     double LCv[4];      /* linear combination variance */
 } ambc_t;
 
+typedef struct {
+    int n;
+    gtime_t start[MAXAMB];
+    gtime_t end[MAXAMB];
+    double amb[MAXAMB];
+    double sigma[MAXAMB];
+    int nobs[MAXAMB];
+} ambinfo_t;
+
 typedef struct {        /* RTK control/result type */
     sol_t  sol;         /* RTK solution */
     double rb[6];       /* base position/velocity (ecef) (m|m/s) */
@@ -1190,6 +1201,7 @@ typedef struct {        /* RTK control/result type */
     int neb;            /* bytes in error message buffer */
     char errbuf[MAXERRMSG]; /* error message buffer */
     prcopt_t opt;       /* processing options */
+    ambinfo_t ambinfo[MAXSAT];
 } rtk_t;
 
 typedef struct {        /* receiver raw data control type */
@@ -1756,6 +1768,7 @@ extern int pppnx(const prcopt_t *opt);
 extern void pppoutsolstat(rtk_t *rtk, int level, FILE *fp);
 extern void windupcorr(gtime_t time, const double *rs, const double *rr,
                        double *phw);
+extern void getambinfo(rtk_t *rtk,  const obs_t *obs, const nav_t *nav);
 
 /* post-processing positioning -----------------------------------------------*/
 extern int postpos(gtime_t ts, gtime_t te, double ti, double tu,

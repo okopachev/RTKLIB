@@ -293,12 +293,15 @@ static int inputobs(obsd_t *obs, int solq, const prcopt_t *popt)
 }
 /* process positioning -------------------------------------------------------*/
 static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
-                    int mode)
+                    int mode, char **infile, int nfile)
 {
     gtime_t time={0};
     sol_t sol={{0}};
     rtk_t rtk;
     obsd_t obs[MAXOBS*2]; /* for rover and base */
+    obs_t inp_obs;
+    nav_t inp_nav;
+    sta_t inp_sta;
     double rb[3]={0};
     int i,nobs,n,solstatic,pri[]={0,1,2,3,4,5,1,6};
     
@@ -316,6 +319,17 @@ static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
     rtkinit(&rtk,popt);
     rtcm_path[0]='\0';
     
+    memset(&inp_obs,0,sizeof(obs_t));
+    memset(&inp_nav,0,sizeof(nav_t));
+    memset(&inp_sta,0,sizeof(sta_t));
+    for(i=0; i<nfile; i++)
+        readrnxt(infile[i],1,time,time,0,popt->rnxopt[0],&inp_obs,&inp_nav,&inp_sta);
+
+    getambinfo(&rtk,&inp_obs, &inp_nav);
+
+    freeobs(&inp_obs);
+    freenav(&inp_nav,0xFF);
+
     while ((nobs=inputobs(obs,rtk.sol.stat,popt))>=0) {
         
         /* exclude satellites */
@@ -965,14 +979,14 @@ static int execses(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
     
     if (popt_.mode==PMODE_SINGLE||popt_.soltype==0) {
         if ((fp=openfile(outfile))) {
-            procpos(fp,&popt_,sopt,0); /* forward */
+            procpos(fp,&popt_,sopt,0,infile,n); /* forward */
             fclose(fp);
         }
     }
     else if (popt_.soltype==1) {
         if ((fp=openfile(outfile))) {
             revs=1; iobsu=iobsr=obss.n-1; isbs=sbss.n-1; ilex=lexs.n-1;
-            procpos(fp,&popt_,sopt,0); /* backward */
+            procpos(fp,&popt_,sopt,0,infile,n); /* backward */
             fclose(fp);
         }
     }
@@ -984,9 +998,9 @@ static int execses(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
         
         if (solf&&solb) {
             isolf=isolb=0;
-            procpos(NULL,&popt_,sopt,1); /* forward */
+            procpos(NULL,&popt_,sopt,1,infile,n); /* forward */
             revs=1; iobsu=iobsr=obss.n-1; isbs=sbss.n-1; ilex=lexs.n-1;
-            procpos(NULL,&popt_,sopt,1); /* backward */
+            procpos(NULL,&popt_,sopt,1,infile,n); /* backward */
             
             /* combine forward/backward solutions */
             if (!aborts&&(fp=openfile(outfile))) {

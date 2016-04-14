@@ -55,6 +55,7 @@ static const char rcsid[]="$Id:$";
 #define VAR_ZTD     SQR(  0.3)      /*   ztd (m^2) */
 #define VAR_GRA     SQR(0.001)      /*   gradient (m^2) */
 #define VAR_BIAS    SQR(100.0)      /*   phase-bias (m^2) */
+#define SIGMA0      SQR(100.0)
 
 #define VAR_IONO_OFF SQR(10.0)      /* variance of iono-model-off */
 
@@ -671,9 +672,9 @@ static void udpos_ppp(rtk_t *rtk)
     if (rtk->opt.mode==PMODE_PPP_STATIC) return;
     
     /* kinmatic mode without dynamics */
-    for (i=0;i<3;i++) {
-        initx(rtk,rtk->sol.rr[i],VAR_POS,i);
-    }
+    //for (i=0;i<3;i++) {
+    //    initx(rtk,rtk->sol.rr[i],VAR_POS,i);
+    //}
 }
 /* temporal update of clock --------------------------------------------------*/
 static void udclk_ppp(rtk_t *rtk)
@@ -1110,6 +1111,7 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
     const prcopt_t *opt=&rtk->opt;
     double *rs,*dts,*var,*v,*H,*R,*azel,*xp,*Pp;
     int i,j,k,nv,info,svh[MAXOBS],stat=SOLQ_SINGLE;
+    double bias;
     
     trace(3,"pppos   : nx=%d n=%d\n",rtk->nx,n);
     
@@ -1147,7 +1149,29 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
 
         /* phase and code residuals */
         if ((nv=res_ppp(i,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel,NULL))<=0) break;
-        
+
+        rtk->P[0] = rtk->sol.qr[0];
+        rtk->P[1 + rtk->nx] = rtk->sol.qr[1];
+        rtk->P[2 + 2 * rtk->nx] = rtk->sol.qr[2];
+        rtk->P[1] = rtk->sol.qr[3];
+        rtk->P[rtk->nx] = rtk->sol.qr[3];
+        rtk->P[2 + rtk->nx] = rtk->sol.qr[4];
+        rtk->P[1 + 2 * rtk->nx] = rtk->sol.qr[4];
+        rtk->P[2] = rtk->sol.qr[5];
+        rtk->P[2 * rtk->nx] = rtk->sol.qr[5];
+
+        for(j = 1; j <= MAXSAT && IB(j, &(rtk->opt)) < rtk->nx; j++)
+        {
+            for(k = 0; k < rtk->ambinfo[j - 1].n; k++)
+                if(rtk->ambinfo[j - 1].start[k].time < obs[0].time.time && obs[0].time.time < rtk->ambinfo[j - 1].end[k].time)
+                  break;
+            if(k < rtk->ambinfo[j - 1].n)
+            {
+                rtk->P[IB(j, &(rtk->opt)) + IB(j, &(rtk->opt)) * rtk->nx] = rtk->ambinfo[j - 1].sigma[k];
+                rtk->x[IB(j, &(rtk->opt))] = rtk->ambinfo[j - 1].amb[k];
+            }
+        }
+
         /* measurement update */
         matcpy(Pp,rtk->P,rtk->nx,rtk->nx);
 
@@ -1253,4 +1277,46 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
     free(xp); free(Pp); free(v); free(H); free(R);
     fprintf(output, "End calculations in precise point positioning mode\n");
     fclose(output);
+}
+
+extern void getambinfo(rtk_t *rtk,  const obs_t *obs, const nav_t *nav)
+{
+    int i, sat;
+    int status[MAXSAT] = {0};
+    double dantr[NFREQ]={0}, dants[NFREQ]={0}, meas[2]={0}, varm[2]={0};
+    double azel[2]={0};
+
+    for(i = 0; i < obs->n; i++)
+    {
+        sat=obs->data[i].sat;
+
+        meas[0] = meas[1] = varm[0] = varm[1] = 0;
+
+        if (!ifmeas(&(obs->data[i]) ,nav,azel,&rtk->opt,dantr,dants,
+                    rtk->ssat[sat-1].phw,meas,varm))
+        {
+            if(status[sat - 1] == 1)
+            {
+              rtk->ambinfo[sat - 1].end[rtk->ambinfo[sat-1].n++] = obs[i].data->time;
+              status[sat - 1] = 0;
+            }
+        }
+        else
+        {
+            if(status[sat - 1] == 0)
+            {
+                rtk->ambinfo[sat - 1].start[rtk->ambinfo[sat-1].n] = obs->data[i].time;
+                rtk->ambinfo[sat - 1].amb[rtk->ambinfo[sat-1].n] = meas[1] - meas[0];
+                rtk->ambinfo[sat - 1].sigma[rtk->ambinfo[sat-1].n] = SIGMA0;
+                rtk->ambinfo[sat - 1].nobs[rtk->ambinfo[sat-1].n] = 1;
+                status[sat - 1] = 1;
+            }
+            else
+            {
+                rtk->ambinfo[sat - 1].amb[rtk->ambinfo[sat-1].n] = (rtk->ambinfo[sat-1].nobs[rtk->ambinfo[sat-1].n] * rtk->ambinfo[sat-1].amb[rtk->ambinfo[sat-1].n] + (meas[1] - meas[0])) / (rtk->ambinfo[sat-1].nobs[rtk->ambinfo[sat-1].n] + 1);
+                rtk->ambinfo[sat-1].nobs[rtk->ambinfo[sat-1].n]++;
+                rtk->ambinfo[sat - 1].sigma[rtk->ambinfo[sat-1].n] = SIGMA0 / sqrt(rtk->ambinfo[sat-1].nobs[rtk->ambinfo[sat-1].n]);
+            }
+        }
+    }
 }

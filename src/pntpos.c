@@ -233,7 +233,7 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
         if ((r=geodist(rs+i*6,rr,e))<=0.0||
             satazel(pos,e,azel+i*2)<opt->elmin) continue;
         
-        fprintf(output, "          range = %f, e1 = %f, e2 = %f, e3 = %f, azimuth = %f, elevation = %f\n", r, e[0], e[1], e[2], e[3], azel[0], azel[1]);
+        fprintf(output, "          range = %f, e1 = %f, e2 = %f, e3 = %f, azimuth = %f, elevation = %f\n", r, e[0], e[1], e[2], azel[i * 2], azel[i * 2 + 1]);
 
         /* psudorange with code bias correction */
         if ((P=prange(obs+i,nav,azel+i*2,iter,opt,&vmeas))==0.0) continue;
