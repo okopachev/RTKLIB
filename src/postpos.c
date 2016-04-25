@@ -47,6 +47,7 @@ static nav_t navs={0};          /* navigation data */
 static sbs_t sbss={0};          /* sbas messages */
 static lex_t lexs={0};          /* lex messages */
 static sta_t stas[MAXRCV];      /* station infomation */
+static antDataSet_t antData={0};    /* antenna data */
 static int nepoch=0;            /* number of observation epochs */
 static int iobsu =0;            /* current rover observation data index */
 static int iobsr =0;            /* current reference observation data index */
@@ -319,6 +320,8 @@ static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
     rtkinit(&rtk,popt);
     rtcm_path[0]='\0';
     
+    rtk.ant_dataset[0] = antData;
+
     memset(&inp_obs,0,sizeof(obs_t));
     memset(&inp_nav,0,sizeof(nav_t));
     memset(&inp_sta,0,sizeof(sta_t));
@@ -914,6 +917,53 @@ static FILE *openfile(const char *outfile)
     
     return !*outfile?stdout:fopen(outfile,"a");
 }
+
+static void readAntennaData(char *inputFile, antDataSet_t *antData)
+{
+    FILE* input = fopen(inputFile, "r");
+    if(input)
+    {
+        fscanf(input, "%f %f %f", &antData->coords[0], &antData->coords[1], &antData->coords[2]);
+        fscanf(input, "%f %f %f", &antData->start_position[0], &antData->start_position[1], &antData->start_position[2]);
+        fclose(input);
+    }
+}
+
+static void readAntennaAngles(char *inputFile, antDataSet_t *antData)
+{
+  FILE* input = fopen(inputFile, "r");
+  char buffer[200];
+  double epoch[6];
+  gtime_t time;
+  double recordTime;
+  int i, recordsCount;
+
+  if(input)
+  {
+      fgets(buffer, 200, input);
+      sscanf(buffer, "%f %f %f %f %f %f %i", &epoch[0], &epoch[1], &epoch[2], &epoch[3], &epoch[4], &epoch[5], &recordsCount);
+
+      antData->ant_data = (antData_t*)calloc(recordsCount, sizeof(antData_t));
+      antData->n = recordsCount;
+      time = epoch2time(epoch);
+      antData->t_otp = time;
+
+      for(i = 0; i < recordsCount && !feof(input); i++)
+      {
+          fgets(buffer, 200, input);
+          sscanf(buffer, "%f %f %f %f", &recordTime, &antData->ant_data[i].angles[0], &antData->ant_data[i].angles[1], &antData->ant_data[i].angles[2]);
+          antData->ant_data[i].time = timeadd(time, recordTime);
+      }
+      fclose(input);
+  }
+}
+
+static void freeAntennaData(antDataSet_t *antData)
+{
+    if(antData->ant_data)
+        free(antData->ant_data);
+}
+
 /* execute processing session ------------------------------------------------*/
 static int execses(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
                    const solopt_t *sopt, const filopt_t *fopt, int flag,
@@ -946,6 +996,13 @@ static int execses(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
         setpcv(obss.n>0?obss.data[0].time:timeget(),&popt_,&navs,&pcvss,&pcvsr,
                stas);
     }
+    /* read antenna parameters */
+    if(fopt->rcvantp[0])
+        readAntennaData(fopt->rcvantp, &antData);
+    /* read antenna angles */
+    if(fopt->tmiangles[0])
+        readAntennaAngles(fopt->tmiangles, &antData);
+
     /* read ocean tide loading parameters */
     if (popt_.mode>PMODE_SINGLE&&fopt->blq) {
         readotl(&popt_,fopt->blq,stas);
@@ -1016,6 +1073,7 @@ static int execses(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
     }
     /* free obs and nav data */
     freeobsnav(&obss,&navs);
+    freeAntennaData(&antData);
     
     return aborts?1:0;
 }

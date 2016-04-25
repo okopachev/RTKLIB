@@ -849,19 +849,80 @@ static void udstate_ppp(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     /* temporal update of phase-bias */
     udbias_ppp(rtk,obs,n,nav);
 }
+static double ant_correction(double* startPos, double* angles, double azimuth, double tOtp, double* unitVector, double* antCoords)
+{
+    double theta = angles[0] - PI / 2, phi = angles[1], psi = angles[2];
+    double B = startPos[0], L = startPos[1];
+    double* M1 = zeros(3,3), *M2 = zeros(3,3), *M3 = zeros(3,3), *M4 = zeros(3,3), *M12 = zeros(3,3), *M34 = zeros(3,3), *M = zeros(3,3);
+    double costheta = cos(theta), sintheta = sin(theta), cosphi = cos(phi), sinphi = sin(phi), cospsi = cos(psi), sinpsi = sin(psi);
+    double cosB = cos(B), sinB = sin(B), cosL = cos(L), sinL = sin(L);
+    double lambda = -tOtp * OMGE;
+    double* r = mat(3,1);
+    double result;
+
+    M1[0 + 0 * 3] = -sintheta * cosphi - costheta * sinpsi * sinphi;
+    M1[0 + 1 * 3] = -costheta * cosphi + sintheta * sinpsi * sinphi;
+    M1[0 + 2 * 3] = cospsi * sinphi;
+    M1[1 + 0 * 3] = costheta * cospsi;
+    M1[1 + 1 * 3] = -sintheta * cospsi;
+    M1[1 + 2 * 3] = sinpsi;
+    M1[2 + 0 * 3] = sintheta * sinphi - costheta * sinpsi * cosphi;
+    M1[2 + 1 * 3] = costheta * sinphi + sintheta * sinpsi * cosphi;
+    M1[2 + 2 * 3] = cospsi * cosphi;
+
+    M2[0 + 0 * 3] = cos(azimuth);
+    M2[0 + 2 * 3] = -sin(azimuth);
+    M2[1 + 1 * 3] = 1;
+    M2[2 + 0 * 3] = sin(azimuth);
+    M2[2 + 2 * 3] = cos(azimuth);
+
+    M3[0 + 0 * 3] = -sinB * cosL;
+    M3[0 + 1 * 3] = -sinB * sinL;
+    M3[0 + 2 * 3] = cosB;
+    M3[1 + 0 * 3] = cosB * cosL;
+    M3[1 + 1 * 3] = cosB * sinL;
+    M3[1 + 2 * 3] = sinB;
+    M3[2 + 0 * 3] = -sinL;
+    M3[2 + 1 * 3] = cosL;
+
+    M4[0 + 0 * 3] = cos(lambda);
+    M4[0 + 1 * 3] = -sin(lambda);
+    M4[1 + 0 * 3] = sin(lambda);
+    M4[1 + 1 * 3] = cos(lambda);
+    M4[2 + 2 * 3] = 1;
+
+    matmul("NN", 3, 3, 3, 1, M1, M2, 0, M12);
+    matmul("NN", 3, 3, 3, 1, M3, M4, 0, M34);
+    matmul("NN", 3, 3, 3, 1, M12, M34, 0, M);
+    matmul("NN", 3, 3, 1, 1, M, antCoords, 0, r);
+
+    free(M1);
+    free(M2);
+    free(M3);
+    free(M4);
+    free(M12);
+    free(M34);
+    free(M);
+
+    result = dot(r, unitVector, 3);
+    free(r);
+
+    return result;
+}
 /* satellite antenna phase center variation ----------------------------------*/
 static void satantpcv(const double *rs, const double *rr, const pcv_t *pcv,
                       double *dant)
 {
     double ru[3],rz[3],eu[3],ez[3],nadir,cosa;
     int i;
-    
+
+
     for (i=0;i<3;i++) {
         ru[i]=rr[i]-rs[i];
         rz[i]=-rs[i];
     }
     if (!normv3(ru,eu)||!normv3(rz,ez)) return;
-    
+
     cosa=dot(eu,ez,3);
     cosa=cosa<-1.0?-1.0:(cosa>1.0?1.0:cosa);
     nadir=acos(cosa);
@@ -896,6 +957,20 @@ static double prectrop(gtime_t time, const double *pos, const double *azel,
     *var=SQR(0.01);
     return m_h*zhd+m_w*(x[0]-zhd);
 }
+static antData_t* findAntData(rtk_t *rtk, int iAnt, gtime_t time)
+{
+    int i;
+    double minDiff = 1e16;
+    antData_t* result = NULL;
+
+    for(i = 0; i < rtk->ant_dataset[iAnt].n; i++)
+        if(fabs(timediff(time, rtk->ant_dataset[iAnt].ant_data[i].time)) < minDiff)
+        {
+            minDiff = fabs(timediff(time, rtk->ant_dataset[iAnt].ant_data[i].time));
+            result = &(rtk->ant_dataset[iAnt].ant_data[i]);
+        }
+    return result;
+}
 /* phase and code residuals --------------------------------------------------*/
 static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
                    const double *dts, const double *vare, const int *svh,
@@ -911,6 +986,8 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
     static gtime_t firstTime = {0};
     int includedSats[MAXSAT], excludedSats[MAXSAT], excludeReasons[MAXSAT];
     int includedSatsCount = 0, excludedSatsCount = 0;
+    double* startPosition, *angles, *antCoords, tOtp;
+    antData_t* antData;
     
     trace(3,"res_ppp : n=%d nx=%d\n",n,nx);
     
@@ -993,9 +1070,15 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
             satantpcv(rs+i*6,rr,nav->pcvs+sat-1,dants);
         }
         /* receiver antenna model */
-        antmodel(opt->pcvr,opt->antdel[0],azel+i*2,opt->posopt[1],dantr);
+        antData = findAntData(rtk, 0, obs[i].time);
+        if(antData)
+        {
+            tOtp = timediff(obs[i].time, rtk->ant_dataset[0].t_otp);
+            dantr[0] = ant_correction(rtk->ant_dataset[0].start_position, antData->angles, azel[i*2], tOtp, e, rtk->ant_dataset[0].coords);
+            dantr[1] = dantr[0];
+        }
         
-        fprintf(output, "        antenna corrections: d_L1 = %f, d_L2 = %f\n", dantr[0], dantr[1]);
+        fprintf(output, "        antenna correction: d_L1 = %f, d_L2 = %f\n", dantr[0]);
 
         /* phase windup correction */
         if (opt->posopt[2]) {
@@ -1022,7 +1105,7 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
             for (k=0;k<nx;k++) H[k+nx*nv]=0.0;
             
             v[nv]=meas[j]-r;
-            
+
             if(j == 0)
               fprintf(output, "        v_phase = %f\n", v[nv]);
             else
@@ -1112,6 +1195,8 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
     double *rs,*dts,*var,*v,*H,*R,*azel,*xp,*Pp;
     int i,j,k,nv,info,svh[MAXOBS],stat=SOLQ_SINGLE;
     double bias;
+    double ep[6];
+    FILE* outputKalman;
     
     trace(3,"pppos   : nx=%d n=%d\n",rtk->nx,n);
     
@@ -1212,6 +1297,28 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav, output
           fprintf(output, "\n");
         }
         
+        outputKalman = fopen("KalmanFiltering.txt", "a");
+
+        time2epoch(obs[0].time, ep);
+        fprintf(outputKalman, "Time: %4.0f/%2.0f/%2.0f %2.0f:%2.0f:%2.4f\n\n", ep[0], ep[1], ep[2], ep[3], ep[4], ep[5]);
+
+        for(j = 0; j < rtk->nx; j++)
+          if(xp[j] != 0)
+            fprintf(outputKalman, "X[%i] = %f\n", j, xp[j]);
+        fprintf(outputKalman, "\n");
+
+        for(j = 0; j < 3; j++)
+        {
+          for(k = 0; k < 3; k++)
+            fprintf(outputKalman, "P[%i][%i] = %f\n", j, k, Pp[k + j * rtk->nx]);
+        }
+        for(j = 5; j < rtk->nx; j++)
+          if(Pp[j + j * rtk->nx] != 0)
+            fprintf(outputKalman, "P[%i][%i] = %f\n", j, j, Pp[j + j * rtk->nx]);
+        fprintf(outputKalman, "\n");
+
+        fclose(outputKalman);
+
         if ((info=filter(xp,Pp,H,v,R,rtk->nx,nv))) {
             trace(2,"ppp filter error %s info=%d\n",time_str(rtk->sol.time,0),
                   info);

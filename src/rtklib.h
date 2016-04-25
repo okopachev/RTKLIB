@@ -1102,6 +1102,7 @@ typedef struct {        /* solution options type */
 typedef struct {        /* file options type */
     char satantp[MAXSTRPATH]; /* satellite antenna parameters file */
     char rcvantp[MAXSTRPATH]; /* receiver antenna parameters file */
+    char tmiangles[MAXSTRPATH];
     char stapos [MAXSTRPATH]; /* station positions file */
     char geoid  [MAXSTRPATH]; /* external geoid data file */
     char iono   [MAXSTRPATH]; /* ionosphere data file */
@@ -1188,6 +1189,19 @@ typedef struct {
     int nobs[MAXAMB];
 } ambinfo_t;
 
+typedef struct {
+    gtime_t time;
+    double angles[3];
+} antData_t;
+
+typedef struct {
+    double coords[3];
+    double start_position[3];
+    gtime_t t_otp;
+    int n;
+    antData_t* ant_data;
+} antDataSet_t;
+
 typedef struct {        /* RTK control/result type */
     sol_t  sol;         /* RTK solution */
     double rb[6];       /* base position/velocity (ecef) (m|m/s) */
@@ -1202,6 +1216,7 @@ typedef struct {        /* RTK control/result type */
     char errbuf[MAXERRMSG]; /* error message buffer */
     prcopt_t opt;       /* processing options */
     ambinfo_t ambinfo[MAXSAT];
+    antDataSet_t ant_dataset[MAXANT];
 } rtk_t;
 
 typedef struct {        /* receiver raw data control type */

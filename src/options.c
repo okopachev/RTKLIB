@@ -150,6 +150,7 @@ opt_t sysopts[]={
     
     {"file-satantfile", 2,  (void *)&filopt_.satantp,    ""     },
     {"file-rcvantfile", 2,  (void *)&filopt_.rcvantp,    ""     },
+    {"file-anglesfile", 2,  (void *)&filopt_.tmiangles,  ""     },
     {"file-staposfile", 2,  (void *)&filopt_.stapos,     ""     },
     {"file-geoidfile",  2,  (void *)&filopt_.geoid,      ""     },
     {"file-ionofile",   2,  (void *)&filopt_.iono,       ""     },

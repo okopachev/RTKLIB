@@ -155,6 +155,8 @@ int main(int argc, char **argv)
         }
         else if (!strcmp(argv[i],"-y")&&i+1<argc) solopt.sstat=atoi(argv[++i]);
         else if (!strcmp(argv[i],"-x")&&i+1<argc) solopt.trace=atoi(argv[++i]);
+        else if (!strcmp(argv[i],"-ant")&&i+1<argc) strcpy(filopt.rcvantp,argv[++i]);
+        else if (!strcmp(argv[i],"-ang")&&i+1<argc) strcpy(filopt.tmiangles,argv[++i]);
         else if (*argv[i]=='-') printhelp();
         else if (n<MAXFILE) infile[n++]=argv[i];
     }
@@ -166,6 +168,8 @@ int main(int argc, char **argv)
     prcopt.outmeasures=1;
     prcopt.outresiduals=1;
     prcopt.outtroposphere=1;
+    prcopt.tropopt = TROPOPT_SAAS;
+    prcopt.ionoopt = IONOOPT_BRDC;
     if (n<=0) {
         showmsg("error : no input file");
         return -2;

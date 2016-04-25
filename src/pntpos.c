@@ -704,5 +704,9 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     free(rs); free(dts); free(var); free(azel_); free(resp);
     fprintf(output, "End calculations in single point positioning mode\n");
     fclose(output);
+    output = fopen("cov_matr_single.txt", "a");
+    time2epoch(sol->time, ep);
+    fprintf(output, "%4.0f/%2.0f/%2.0f %2.0f:%2.0f:%2.4f coords: %f %f %f %f %f %f velocities: %f %f %f %f %f %f\n", ep[0], ep[1], ep[2], ep[3], ep[4], ep[5], sol->qr[0], sol->qr[3], sol->qr[5], sol->qr[1], sol->qr[4], sol->qr[2], sol->qvr[0], sol->qvr[3], sol->qvr[5], sol->qvr[1], sol->qvr[4], sol->qvr[2]);
+    fclose(output);
     return stat;
 }
