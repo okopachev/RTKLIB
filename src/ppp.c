@@ -894,7 +894,7 @@ static double ant_correction(double* startPos, double* angles, double azimuth, d
     matmul("NN", 3, 3, 3, 1, M1, M2, 0, M12);
     matmul("NN", 3, 3, 3, 1, M3, M4, 0, M34);
     matmul("NN", 3, 3, 3, 1, M12, M34, 0, M);
-    matmul("NN", 3, 3, 1, 1, M, antCoords, 0, r);
+    matmul("NN", 3, 1, 3, 1, M, antCoords, 0, r);
 
     free(M1);
     free(M2);
@@ -1078,7 +1078,7 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
             dantr[1] = dantr[0];
         }
         
-        fprintf(output, "        antenna correction: d_L1 = %f, d_L2 = %f\n", dantr[0]);
+        fprintf(output, "        antenna correction: d_L1 = %f\n", dantr[0]);
 
         /* phase windup correction */
         if (opt->posopt[2]) {
